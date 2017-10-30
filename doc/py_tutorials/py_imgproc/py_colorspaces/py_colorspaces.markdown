@@ -24,7 +24,7 @@ commands in your Python terminal :
 @code{.py}
 >>> import cv2
 >>> flags = [i for i in dir(cv2) if i.startswith('COLOR_')]
->>> print flags
+>>> print( flags )
 @endcode
 @note For HSV, Hue range is [0,179], Saturation range is [0,255] and Value range is [0,255].
 Different softwares use different scales. So if you are comparing OpenCV values with them, you need
@@ -34,7 +34,7 @@ Object Tracking
 ---------------
 
 Now we know how to convert BGR image to HSV, we can use this to extract a colored object. In HSV, it
-is more easier to represent a color than RGB color-space. In our application, we will try to extract
+is more easier to represent a color than in BGR color-space. In our application, we will try to extract
 a blue colored object. So here is the method:
 
 -   Take each frame of the video
@@ -62,7 +62,7 @@ while(1):
     upper_blue = np.array([130,255,255])
 
     # Threshold the HSV image to get only blue colors
-    mask = cv2.inRange(hsv, lower_green, upper_green)
+    mask = cv2.inRange(hsv, lower_blue, upper_blue)
 
     # Bitwise-AND mask and original image
     res = cv2.bitwise_and(frame,frame, mask= mask)
@@ -89,14 +89,14 @@ just by moving your hand in front of camera and many other funny stuffs.
 How to find HSV values to track?
 --------------------------------
 
-This is a common question found in [stackoverflow.com](www.stackoverflow.com). It is very simple and
+This is a common question found in [stackoverflow.com](http://www.stackoverflow.com). It is very simple and
 you can use the same function, cv2.cvtColor(). Instead of passing an image, you just pass the BGR
 values you want. For example, to find the HSV value of Green, try following commands in Python
 terminal:
 @code{.py}
 >>> green = np.uint8([[[0,255,0 ]]])
 >>> hsv_green = cv2.cvtColor(green,cv2.COLOR_BGR2HSV)
->>> print hsv_green
+>>> print( hsv_green )
 [[[ 60 255 255]]]
 @endcode
 Now you take [H-10, 100,100] and [H+10, 255, 255] as lower bound and upper bound respectively. Apart

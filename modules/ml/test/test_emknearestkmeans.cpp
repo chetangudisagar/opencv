@@ -50,6 +50,7 @@ using cv::ml::KNearest;
 static
 void defaultDistribs( Mat& means, vector<Mat>& covs, int type=CV_32FC1 )
 {
+    CV_TRACE_FUNCTION();
     float mp0[] = {0.0f, 0.0f}, cp0[] = {0.67f, 0.0f, 0.0f, 0.67f};
     float mp1[] = {5.0f, 0.0f}, cp1[] = {1.0f, 0.0f, 0.0f, 1.0f};
     float mp2[] = {1.0f, 5.0f}, cp2[] = {1.0f, 0.0f, 0.0f, 1.0f};
@@ -76,6 +77,7 @@ void defaultDistribs( Mat& means, vector<Mat>& covs, int type=CV_32FC1 )
 static
 void generateData( Mat& data, Mat& labels, const vector<int>& sizes, const Mat& _means, const vector<Mat>& covs, int dataType, int labelType )
 {
+    CV_TRACE_FUNCTION();
     vector<int>::const_iterator sit = sizes.begin();
     int total = 0;
     for( ; sit != sizes.end(); ++sit )
@@ -226,6 +228,7 @@ protected:
 
 void CV_KMeansTest::run( int /*start_from*/ )
 {
+    CV_TRACE_FUNCTION();
     const int iters = 100;
     int sizesArr[] = { 5000, 7000, 8000 };
     int pointsCount = sizesArr[0]+ sizesArr[1] + sizesArr[2];
@@ -330,7 +333,8 @@ void CV_KNearestTest::run( int /*start_from*/ )
     }
 
     // KNearest KDTree implementation
-    Ptr<KNearest> knearestKdt = KNearest::create(ml::KNearest::Params(10, true, INT_MAX, ml::KNearest::KDTREE));
+    Ptr<KNearest> knearestKdt = KNearest::create();
+    knearestKdt->setAlgorithmType(KNearest::KDTREE);
     knearestKdt->train(trainData, ml::ROW_SAMPLE, trainLabels);
     knearestKdt->findNearest(testData, 4, bestLabels);
     if( !calcErr( bestLabels, testLabels, sizes, err, true ) )
@@ -394,16 +398,18 @@ int CV_EMTest::runCase( int caseIndex, const EM_Params& params,
     cv::Mat labels;
     float err;
 
-    Ptr<EM> em;
-    EM::Params emp(params.nclusters, params.covMatType, params.termCrit);
+    Ptr<EM> em = EM::create();
+    em->setClustersNumber(params.nclusters);
+    em->setCovarianceMatrixType(params.covMatType);
+    em->setTermCriteria(params.termCrit);
     if( params.startStep == EM::START_AUTO_STEP )
-        em = EM::train( trainData, noArray(), labels, noArray(), emp );
+        em->trainEM( trainData, noArray(), labels, noArray() );
     else if( params.startStep == EM::START_E_STEP )
-        em = EM::train_startWithE( trainData, *params.means, *params.covs,
-                                   *params.weights, noArray(), labels, noArray(), emp );
+        em->trainE( trainData, *params.means, *params.covs,
+                    *params.weights, noArray(), labels, noArray() );
     else if( params.startStep == EM::START_M_STEP )
-        em = EM::train_startWithM( trainData, *params.probs,
-                                   noArray(), labels, noArray(), emp );
+        em->trainM( trainData, *params.probs,
+                    noArray(), labels, noArray() );
 
     // check train error
     if( !calcErr( labels, trainLabels, sizes, err , false, false ) )
@@ -543,7 +549,9 @@ protected:
 
         Mat labels;
 
-        Ptr<EM> em = EM::train(samples, noArray(), labels, noArray(), EM::Params(nclusters));
+        Ptr<EM> em = EM::create();
+        em->setClustersNumber(nclusters);
+        em->trainEM(samples, noArray(), labels, noArray());
 
         Mat firstResult(samples.rows, 1, CV_32SC1);
         for( int i = 0; i < samples.rows; i++)
@@ -571,7 +579,7 @@ protected:
         // Read in
         try
         {
-            em = StatModel::load<EM>(filename);
+            em = Algorithm::load<EM>(filename);
         }
         catch(...)
         {
@@ -613,6 +621,7 @@ protected:
         {
             ts->printf(cvtest::TS::LOG, "File with spambase dataset cann't be read.\n");
             ts->set_failed_test_info(cvtest::TS::FAIL_INVALID_TEST_DATA);
+            return;
         }
 
         Mat samples = data->getSamples();
@@ -644,8 +653,13 @@ protected:
                     samples1.push_back(sample);
             }
         }
-        Ptr<EM> model0 = EM::train(samples0, noArray(), noArray(), noArray(), EM::Params(3));
-        Ptr<EM> model1 = EM::train(samples1, noArray(), noArray(), noArray(), EM::Params(3));
+        Ptr<EM> model0 = EM::create();
+        model0->setClustersNumber(3);
+        model0->trainEM(samples0, noArray(), noArray(), noArray());
+
+        Ptr<EM> model1 = EM::create();
+        model1->setClustersNumber(3);
+        model1->trainEM(samples1, noArray(), noArray(), noArray());
 
         Mat trainConfusionMat(2, 2, CV_32SC1, Scalar(0)),
             testConfusionMat(2, 2, CV_32SC1, Scalar(0));

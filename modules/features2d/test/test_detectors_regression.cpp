@@ -40,7 +40,6 @@
 //M*/
 
 #include "test_precomp.hpp"
-#include "opencv2/highgui.hpp"
 
 using namespace std;
 using namespace cv;
@@ -259,6 +258,12 @@ TEST( Features2d_Detector_FAST, regression )
     test.safe_run();
 }
 
+TEST( Features2d_Detector_AGAST, regression )
+{
+    CV_FeatureDetectorTest test( "detector-agast", AgastFeatureDetector::create() );
+    test.safe_run();
+}
+
 TEST( Features2d_Detector_GFTT, regression )
 {
     CV_FeatureDetectorTest test( "detector-gftt", GFTTDetector::create() );
@@ -294,5 +299,11 @@ TEST( Features2d_Detector_KAZE, regression )
 TEST( Features2d_Detector_AKAZE, regression )
 {
     CV_FeatureDetectorTest test( "detector-akaze", AKAZE::create() );
+    test.safe_run();
+}
+
+TEST( Features2d_Detector_AKAZE_DESCRIPTOR_KAZE, regression )
+{
+    CV_FeatureDetectorTest test( "detector-akaze-with-kaze-desc", AKAZE::create(AKAZE::DESCRIPTOR_KAZE) );
     test.safe_run();
 }

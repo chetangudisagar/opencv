@@ -529,7 +529,7 @@ endmacro()
 
 # Check to see if the CUDA_TOOLKIT_ROOT_DIR and CUDA_SDK_ROOT_DIR have changed,
 # if they have then clear the cache variables, so that will be detected again.
-if(NOT "${CUDA_TOOLKIT_ROOT_DIR}" STREQUAL "${CUDA_TOOLKIT_ROOT_DIR_INTERNAL}")
+if(DEFINED CUDA_TOOLKIT_ROOT_DIR_INTERNAL AND (NOT "${CUDA_TOOLKIT_ROOT_DIR}" STREQUAL "${CUDA_TOOLKIT_ROOT_DIR_INTERNAL}"))
   unset(CUDA_TARGET_TRIPLET CACHE)
   unset(CUDA_TOOLKIT_TARGET_DIR CACHE)
   unset(CUDA_NVCC_EXECUTABLE CACHE)
@@ -537,8 +537,8 @@ if(NOT "${CUDA_TOOLKIT_ROOT_DIR}" STREQUAL "${CUDA_TOOLKIT_ROOT_DIR_INTERNAL}")
   cuda_unset_include_and_libraries()
 endif()
 
-if(NOT "${CUDA_TARGET_TRIPLET}" STREQUAL "${CUDA_TARGET_TRIPLET_INTERNAL}" OR
-   NOT "${CUDA_TOOLKIT_TARGET_DIR}" STREQUAL "${CUDA_TOOLKIT_TARGET_DIR_INTERNAL}")
+if(DEFINED CUDA_TARGET_TRIPLET_INTERNAL AND (NOT "${CUDA_TARGET_TRIPLET}" STREQUAL "${CUDA_TARGET_TRIPLET_INTERNAL}") OR
+   (DEFINED CUDA_TOOLKIT_TARGET_DIR  AND DEFINED CUDA_TOOLKIT_TARGET_DIR_INTERNAL AND NOT "${CUDA_TOOLKIT_TARGET_DIR}" STREQUAL "${CUDA_TOOLKIT_TARGET_DIR_INTERNAL}"))
   cuda_unset_include_and_libraries()
 endif()
 
@@ -619,6 +619,8 @@ if(DEFINED CUDA_TARGET_CPU_ARCH)
   set(_cuda_target_cpu_arch_initial "${CUDA_TARGET_CPU_ARCH}")
 elseif(CUDA_VERSION VERSION_GREATER "5.0" AND CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm|ARM)")
   set(_cuda_target_cpu_arch_initial "ARM")
+elseif(CUDA_VERSION VERSION_GREATER "6.5" AND CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|AARCH64)")
+  set(_cuda_target_cpu_arch_initial "AARCH64")
 else()
   set(_cuda_target_cpu_arch_initial "")
 endif()
@@ -637,11 +639,17 @@ mark_as_advanced(CUDA_TARGET_OS_VARIANT)
 # Target triplet
 if(DEFINED CUDA_TARGET_TRIPLET)
   set(_cuda_target_triplet_initial "${CUDA_TARGET_TRIPLET}")
-elseif(CUDA_VERSION VERSION_GREATER "5.0" AND CMAKE_CROSSCOMPILING AND "${CUDA_TARGET_CPU_ARCH}" STREQUAL "ARM")
+elseif(CUDA_VERSION VERSION_GREATER "5.0" AND CMAKE_CROSSCOMPILING AND "x${CUDA_TARGET_CPU_ARCH}" STREQUAL "xARM")
   if("${CUDA_TARGET_OS_VARIANT}" STREQUAL "Android" AND EXISTS "${CUDA_TOOLKIT_ROOT_DIR}/targets/armv7-linux-androideabi")
     set(_cuda_target_triplet_initial "armv7-linux-androideabi")
   elseif(EXISTS "${CUDA_TOOLKIT_ROOT_DIR}/targets/armv7-linux-gnueabihf")
     set(_cuda_target_triplet_initial "armv7-linux-gnueabihf")
+  endif()
+elseif(CUDA_VERSION VERSION_GREATER "6.5" AND CMAKE_CROSSCOMPILING AND "x${CUDA_TARGET_CPU_ARCH}" STREQUAL "xAARCH64")
+  if("${CUDA_TARGET_OS_VARIANT}" STREQUAL "Android" AND EXISTS "${CUDA_TOOLKIT_ROOT_DIR}/targets/aarch64-linux-androideabi")
+    set(_cuda_target_triplet_initial "aarch64-linux-androideabi")
+  elseif(EXISTS "${CUDA_TOOLKIT_ROOT_DIR}/targets/aarch64-linux-gnueabihf")
+    set(_cuda_target_triplet_initial "aarch64-linux-gnueabihf")
   endif()
 endif()
 set(CUDA_TARGET_TRIPLET "${_cuda_target_triplet_initial}" CACHE STRING "Specify the target triplet for which the input files must be compiled.")
@@ -677,6 +685,9 @@ macro(cuda_find_library_local_first_with_path_ext _var _names _doc _path_ext )
     # and old paths.
     set(_cuda_64bit_lib_dir "${_path_ext}lib/x64" "${_path_ext}lib64" "${_path_ext}libx64" )
   endif()
+  if(CMAKE_CROSSCOMPILING AND (ARM OR AARCH64))
+    set(_cuda_cross_arm_lib_dir "${_path_ext}lib/stubs")
+  endif()
   if(CUDA_VERSION VERSION_GREATER "6.0")
     set(_cuda_static_lib_names "")
     foreach(name ${_names})
@@ -690,7 +701,7 @@ macro(cuda_find_library_local_first_with_path_ext _var _names _doc _path_ext )
     PATHS "${CUDA_TOOLKIT_TARGET_DIR}" "${CUDA_TOOLKIT_ROOT_DIR}"
     ENV CUDA_PATH
     ENV CUDA_LIB_PATH
-    PATH_SUFFIXES ${_cuda_64bit_lib_dir} "${_path_ext}lib/Win32" "${_path_ext}lib" "${_path_ext}libWin32"
+    PATH_SUFFIXES ${_cuda_64bit_lib_dir} ${_cuda_cross_arm_lib_dir} "${_path_ext}lib/Win32" "${_path_ext}lib" "${_path_ext}libWin32"
     DOC ${_doc}
     NO_DEFAULT_PATH
     )
@@ -776,8 +787,24 @@ if(NOT CUDA_VERSION VERSION_LESS "3.2")
     find_cuda_helper_libs(nvcuvid)
   endif()
 endif()
-if(CUDA_VERSION VERSION_GREATER "5.0")
-  # In CUDA 5.5 NPP was splitted onto 3 separate libraries.
+if(CUDA_VERSION VERSION_GREATER "7.5")
+  # In CUDA 8.0 NPPI was split in to many libraries.
+  find_cuda_helper_libs(nppc)
+  find_cuda_helper_libs(nppial)
+  find_cuda_helper_libs(nppicc)
+  find_cuda_helper_libs(nppicom)
+  find_cuda_helper_libs(nppidei)
+  find_cuda_helper_libs(nppif)
+  find_cuda_helper_libs(nppig)
+  find_cuda_helper_libs(nppim)
+  find_cuda_helper_libs(nppist)
+  find_cuda_helper_libs(nppisu)
+  find_cuda_helper_libs(nppitc)
+  find_cuda_helper_libs(npps)
+  set(CUDA_nppi_LIBRARY "${CUDA_nppial_LIBRARY};${CUDA_nppicc_LIBRARY};${CUDA_nppicom_LIBRARY};${CUDA_nppidei_LIBRARY};${CUDA_nppif_LIBRARY};${CUDA_nppig_LIBRARY};${CUDA_nppim_LIBRARY};${CUDA_nppist_LIBRARY};${CUDA_nppisu_LIBRARY};${CUDA_nppitc_LIBRARY}")
+  set(CUDA_npp_LIBRARY "${CUDA_nppc_LIBRARY};${CUDA_nppi_LIBRARY};${CUDA_npps_LIBRARY}")
+elseif(CUDA_VERSION VERSION_GREATER "5.0")
+  # In CUDA 5.5 NPP was split in to 3 separate libraries.
   find_cuda_helper_libs(nppc)
   find_cuda_helper_libs(nppi)
   find_cuda_helper_libs(npps)
@@ -1094,8 +1121,10 @@ macro(CUDA_WRAP_SRCS cuda_target format generated_files)
     set(nvcc_flags ${nvcc_flags} -m32)
   endif()
 
-  if(CUDA_TARGET_CPU_ARCH)
-    set(nvcc_flags ${nvcc_flags} "--target-cpu-architecture=${CUDA_TARGET_CPU_ARCH}")
+  if(CUDA_TARGET_CPU_ARCH AND CUDA_VERSION VERSION_LESS "7.0")
+    # CPU architecture is either ARM or X86. Patch AARCH64 to be ARM
+    string(REPLACE "AARCH64" "ARM" CUDA_TARGET_CPU_ARCH_patched ${CUDA_TARGET_CPU_ARCH})
+    set(nvcc_flags ${nvcc_flags} "--target-cpu-architecture=${CUDA_TARGET_CPU_ARCH_patched}")
   endif()
 
   if(CUDA_TARGET_OS_VARIANT AND CUDA_VERSION VERSION_LESS "7.0")
@@ -1543,7 +1572,7 @@ macro(CUDA_ADD_LIBRARY cuda_target)
   # variable will have been defined.
   CUDA_LINK_SEPARABLE_COMPILATION_OBJECTS("${link_file}" ${cuda_target} "${_options}" "${${cuda_target}_SEPARABLE_COMPILATION_OBJECTS}")
 
-  target_link_libraries(${cuda_target}
+  target_link_libraries(${cuda_target} LINK_PRIVATE
     ${CUDA_LIBRARIES}
     )
 
@@ -1587,7 +1616,7 @@ macro(CUDA_ADD_EXECUTABLE cuda_target)
   # variable will have been defined.
   CUDA_LINK_SEPARABLE_COMPILATION_OBJECTS("${link_file}" ${cuda_target} "${_options}" "${${cuda_target}_SEPARABLE_COMPILATION_OBJECTS}")
 
-  target_link_libraries(${cuda_target}
+  target_link_libraries(${cuda_target} LINK_PRIVATE
     ${CUDA_LIBRARIES}
     )
 
@@ -1662,9 +1691,9 @@ endmacro()
 ###############################################################################
 macro(CUDA_ADD_CUFFT_TO_TARGET target)
   if (CUDA_BUILD_EMULATION)
-    target_link_libraries(${target} ${CUDA_cufftemu_LIBRARY})
+    target_link_libraries(${target} LINK_PRIVATE ${CUDA_cufftemu_LIBRARY})
   else()
-    target_link_libraries(${target} ${CUDA_cufft_LIBRARY})
+    target_link_libraries(${target} LINK_PRIVATE ${CUDA_cufft_LIBRARY})
   endif()
 endmacro()
 
@@ -1675,9 +1704,9 @@ endmacro()
 ###############################################################################
 macro(CUDA_ADD_CUBLAS_TO_TARGET target)
   if (CUDA_BUILD_EMULATION)
-    target_link_libraries(${target} ${CUDA_cublasemu_LIBRARY})
+    target_link_libraries(${target} LINK_PRIVATE ${CUDA_cublasemu_LIBRARY})
   else()
-    target_link_libraries(${target} ${CUDA_cublas_LIBRARY})
+    target_link_libraries(${target} LINK_PRIVATE ${CUDA_cublas_LIBRARY})
   endif()
 endmacro()
 

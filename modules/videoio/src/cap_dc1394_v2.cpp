@@ -45,7 +45,7 @@
 
 #include <unistd.h>
 #include <stdint.h>
-#ifdef WIN32
+#ifdef _WIN32
   // On Windows, we have no sys/select.h, but we need to pick up
   // select() which is in winsock2.
   #ifndef __SYS_SELECT_H__
@@ -54,7 +54,7 @@
   #endif
 #else
   #include <sys/select.h>
-#endif /*WIN32*/
+#endif /*_WIN32*/
 #include <dc1394/dc1394.h>
 #include <stdlib.h>
 #include <string.h>
@@ -278,6 +278,7 @@ CvCaptureCAM_DC1394_v2_CPP::CvCaptureCAM_DC1394_v2_CPP()
     dcCam = 0;
     isoSpeed = 400;
     fps = 15;
+    // Resetted the value here to 1 in order to ensure only a single frame is stored in the buffer!
     nDMABufs = 8;
     started = false;
     cameraId = 0;
@@ -602,9 +603,9 @@ bool CvCaptureCAM_DC1394_v2_CPP::grabFrame()
         cvInitImageHeader(&fhdr, cvSize(fc->size[0], fc->size[1]), 8, nch);
         cvSetData(&fhdr, fc->image, fc->size[0]*nch);
 
-    // Swap R&B channels:
-    if (nch==3)
-        cvConvertImage(&fhdr,&fhdr,CV_CVTIMG_SWAP_RB);
+        // Swap R&B channels:
+        if (nch==3)
+            cvConvertImage(&fhdr,&fhdr,CV_CVTIMG_SWAP_RB);
 
         if( rectify && cameraId == VIDERE && nimages == 2 )
         {
@@ -688,6 +689,8 @@ double CvCaptureCAM_DC1394_v2_CPP::getProperty(int propId) const
         break;
     case CV_CAP_PROP_ISO_SPEED:
         return (double) isoSpeed;
+    case CV_CAP_PROP_BUFFERSIZE:
+        return (double) nDMABufs;
     default:
         if (propId<CV_CAP_PROP_MAX_DC1394 && dc1394properties[propId]!=-1
             && dcCam)
@@ -734,6 +737,11 @@ bool CvCaptureCAM_DC1394_v2_CPP::setProperty(int propId, double value)
         if(started)
           return false;
         isoSpeed = cvRound(value);
+        break;
+    case CV_CAP_PROP_BUFFERSIZE:
+        if(started)
+            return false;
+        nDMABufs = value;
         break;
         //The code below is based on coriander, callbacks.c:795, refer to case RANGE_MENU_MAN :
          default:

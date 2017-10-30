@@ -39,8 +39,8 @@
 //
 //M*/
 
-#ifndef __OPENCV_OPTIM_HPP__
-#define __OPENCV_OPTIM_HPP__
+#ifndef OPENCV_OPTIM_HPP
+#define OPENCV_OPTIM_HPP
 
 #include "opencv2/core.hpp"
 
@@ -63,15 +63,17 @@ public:
     class CV_EXPORTS Function
     {
     public:
-       virtual ~Function() {}
-       virtual double calc(const double* x) const = 0;
-       virtual void getGradient(const double* /*x*/,double* /*grad*/) {}
+        virtual ~Function() {}
+        virtual int getDims() const = 0;
+        virtual double getGradientEps() const;
+        virtual double calc(const double* x) const = 0;
+        virtual void getGradient(const double* x,double* grad);
     };
 
     /** @brief Getter for the optimized function.
 
     The optimized function is represented by Function interface, which requires derivatives to
-    implement the sole method calc(double*) to evaluate the function.
+    implement the calc(double*) and getDim() methods to evaluate the function.
 
     @return Smart-pointer to an object that implements Function interface - it represents the
     function that is being optimized. It can be empty, if no function was given so far.
@@ -274,7 +276,7 @@ column vector and \f$x\f$ is an arbitrary `n`-by-`1` column vector, which satisf
 
 Simplex algorithm is one of many algorithms that are designed to handle this sort of problems
 efficiently. Although it is not optimal in theoretical sense (there exist algorithms that can solve
-any problem written as above in polynomial type, while simplex method degenerates to exponential
+any problem written as above in polynomial time, while simplex method degenerates to exponential
 time for some special cases), it is well-studied, easy to implement and is shown to work well for
 real-life purposes.
 

@@ -3,7 +3,7 @@
 #include "opencv2/highgui.hpp"
 #include "opencv2/calib3d.hpp"
 #include "opencv2/video.hpp"
-#include "opencv2/cuda.hpp"
+#include "opencv2/cudalegacy.hpp"
 #include "opencv2/cudaimgproc.hpp"
 #include "opencv2/cudaarithm.hpp"
 #include "opencv2/cudawarping.hpp"
@@ -1191,10 +1191,10 @@ TEST(GoodFeaturesToTrack)
 
 TEST(MOG)
 {
-    const std::string inputFile = abspath("../data/768x576.avi");
+    const std::string inputFile = abspath("../data/vtest.avi");
 
     cv::VideoCapture cap(inputFile);
-    if (!cap.isOpened()) throw runtime_error("can't open ../data/768x576.avi");
+    if (!cap.isOpened()) throw runtime_error("can't open ../data/vtest.avi");
 
     cv::Mat frame;
     cap >> frame;

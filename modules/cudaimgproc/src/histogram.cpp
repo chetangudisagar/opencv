@@ -55,11 +55,11 @@ cv::Ptr<cv::cuda::CLAHE> cv::cuda::createCLAHE(double, cv::Size) { throw_no_cuda
 
 void cv::cuda::evenLevels(OutputArray, int, int, int, Stream&) { throw_no_cuda(); }
 
-void cv::cuda::histEven(InputArray, OutputArray, InputOutputArray, int, int, int, Stream&) { throw_no_cuda(); }
-void cv::cuda::histEven(InputArray, GpuMat*, InputOutputArray, int*, int*, int*, Stream&) { throw_no_cuda(); }
+void cv::cuda::histEven(InputArray, OutputArray, int, int, int, Stream&) { throw_no_cuda(); }
+void cv::cuda::histEven(InputArray, GpuMat*, int*, int*, int*, Stream&) { throw_no_cuda(); }
 
-void cv::cuda::histRange(InputArray, OutputArray, InputArray, InputOutputArray, Stream&) { throw_no_cuda(); }
-void cv::cuda::histRange(InputArray, GpuMat*, const GpuMat*, InputOutputArray, Stream&) { throw_no_cuda(); }
+void cv::cuda::histRange(InputArray, OutputArray, InputArray, Stream&) { throw_no_cuda(); }
+void cv::cuda::histRange(InputArray, GpuMat*, const GpuMat*, Stream&) { throw_no_cuda(); }
 
 #else /* !defined (HAVE_CUDA) */
 
@@ -69,20 +69,32 @@ void cv::cuda::histRange(InputArray, GpuMat*, const GpuMat*, InputOutputArray, S
 namespace hist
 {
     void histogram256(PtrStepSzb src, int* hist, cudaStream_t stream);
+    void histogram256(PtrStepSzb src, PtrStepSzb mask, int* hist, cudaStream_t stream);
 }
 
 void cv::cuda::calcHist(InputArray _src, OutputArray _hist, Stream& stream)
 {
+    calcHist(_src, cv::cuda::GpuMat(), _hist, stream);
+}
+
+void cv::cuda::calcHist(InputArray _src, InputArray _mask, OutputArray _hist, Stream& stream)
+{
     GpuMat src = _src.getGpuMat();
+    GpuMat mask = _mask.getGpuMat();
 
     CV_Assert( src.type() == CV_8UC1 );
+    CV_Assert( mask.empty() || mask.type() == CV_8UC1 );
+    CV_Assert( mask.empty() || mask.size() == src.size() );
 
     _hist.create(1, 256, CV_32SC1);
     GpuMat hist = _hist.getGpuMat();
 
     hist.setTo(Scalar::all(0), stream);
 
-    hist::histogram256(src, hist.ptr<int>(), StreamAccessor::getStream(stream));
+    if (mask.empty())
+        hist::histogram256(src, hist.ptr<int>(), StreamAccessor::getStream(stream));
+    else
+        hist::histogram256(src, mask, hist.ptr<int>(), StreamAccessor::getStream(stream));
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -140,8 +152,6 @@ namespace
     public:
         CLAHE_Impl(double clipLimit = 40.0, int tilesX = 8, int tilesY = 8);
 
-        cv::AlgorithmInfo* info() const;
-
         void apply(cv::InputArray src, cv::OutputArray dst);
         void apply(InputArray src, OutputArray dst, Stream& stream);
 
@@ -166,11 +176,6 @@ namespace
         clipLimit_(clipLimit), tilesX_(tilesX), tilesY_(tilesY)
     {
     }
-
-    CV_INIT_ALGORITHM(CLAHE_Impl, "CLAHE_CUDA",
-        obj.info()->addParam(obj, "clipLimit", obj.clipLimit_);
-        obj.info()->addParam(obj, "tilesX", obj.tilesX_);
-        obj.info()->addParam(obj, "tilesY", obj.tilesY_))
 
     void CLAHE_Impl::apply(cv::InputArray _src, cv::OutputArray _dst)
     {

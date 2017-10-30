@@ -146,6 +146,7 @@ CV_IMPL int cvInitSystem( int argc, char** argv )
         }
         wasInitialized = 1;
     }
+    setlocale(LC_NUMERIC,"C");
 
     return 0;
 }
@@ -281,7 +282,7 @@ static void icvPutImage( CvWindow* window )
 
 static void icvUpdateWindowSize( const CvWindow* window )
 {
-    int width = 0, height = 240; /* init à al taille de base de l'image*/
+    int width = 0, height = 240;
     Rect globalBounds;
 
     GetWindowBounds(window->window, kWindowContentRgn, &globalBounds);
@@ -1030,7 +1031,7 @@ static pascal OSStatus windowEventHandler(EventHandlerCallRef nextHandler, Event
                 GetWindowBounds(theWindow, kWindowStructureRgn, &structure);
                 GetWindowBounds(theWindow, kWindowContentRgn, &content);
                 lx = (int)point.x - content.left + structure.left;
-                ly = (int)point.y - window->trackbarheight  - content.top + structure.top; /* minus la taille des trackbars */
+                ly = (int)point.y - window->trackbarheight  - content.top + structure.top;
                 if (window->flags & CV_WINDOW_AUTOSIZE) {//FD
                                                          //printf("was %d,%d\n", lx, ly);
                     /* scale the mouse coordinates */
@@ -1038,7 +1039,7 @@ static pascal OSStatus windowEventHandler(EventHandlerCallRef nextHandler, Event
                     ly = ly * window->imageHeight / (content.bottom - content.top - window->trackbarheight);
                 }
 
-                if (lx>0 && ly >0){ /* a remettre dans les coordonnées locale */
+                if (lx>0 && ly >0){
                     window->on_mouse (event, lx, ly, flags, window->on_mouse_param);
                     return noErr;
                 }

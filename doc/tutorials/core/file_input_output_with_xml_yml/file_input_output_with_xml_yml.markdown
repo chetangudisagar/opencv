@@ -16,13 +16,13 @@ Source code
 -----------
 
 You can [download this from here
-](https://github.com/Itseez/opencv/tree/master/samples/cpp/tutorial_code/core/file_input_output/file_input_output.cpp) or find it in the
+](https://github.com/opencv/opencv/tree/master/samples/cpp/tutorial_code/core/file_input_output/file_input_output.cpp) or find it in the
 `samples/cpp/tutorial_code/core/file_input_output/file_input_output.cpp` of the OpenCV source code
 library.
 
 Here's a sample code of how to achieve all the stuff enumerated at the goal list.
 
-@includelineno cpp/tutorial_code/core/file_input_output/file_input_output.cpp
+@include cpp/tutorial_code/core/file_input_output/file_input_output.cpp
 
 Explanation
 -----------
@@ -263,8 +263,4 @@ MyData:
 You may observe a runtime instance of this on the [YouTube
 here](https://www.youtube.com/watch?v=A4yqVnByMMM) .
 
-\htmlonly
-<div align="center">
-<iframe title="File Input and Output using XML and YAML files in OpenCV" width="560" height="349" src="http://www.youtube.com/embed/A4yqVnByMMM?rel=0&loop=1" frameborder="0" allowfullscreen align="middle"></iframe>
-</div>
-\endhtmlonly
+@youtube{A4yqVnByMMM}

@@ -6,7 +6,7 @@ extern "C"
 {
 #endif
 
-#if defined WIN32 || defined _WIN32
+#if defined _WIN32
 #   define OPENCV_FFMPEG_API __declspec(dllexport)
 #elif defined __GNUC__ && __GNUC__ >= 4
 #   define OPENCV_FFMPEG_API __attribute__ ((visibility ("default")))
@@ -23,7 +23,9 @@ enum
     CV_FFMPEG_CAP_PROP_FRAME_HEIGHT=4,
     CV_FFMPEG_CAP_PROP_FPS=5,
     CV_FFMPEG_CAP_PROP_FOURCC=6,
-    CV_FFMPEG_CAP_PROP_FRAME_COUNT=7
+    CV_FFMPEG_CAP_PROP_FRAME_COUNT=7,
+    CV_FFMPEG_CAP_PROP_SAR_NUM=40,
+    CV_FFMPEG_CAP_PROP_SAR_DEN=41
 };
 
 

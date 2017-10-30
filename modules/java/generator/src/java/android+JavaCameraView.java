@@ -12,6 +12,7 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.ViewGroup.LayoutParams;
 
+import org.opencv.BuildConfig;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
@@ -40,14 +41,17 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
     protected Camera mCamera;
     protected JavaCameraFrame[] mCameraFrame;
     private SurfaceTexture mSurfaceTexture;
+    private int mPreviewFormat = ImageFormat.NV21;
 
     public static class JavaCameraSizeAccessor implements ListItemAccessor {
 
+        @Override
         public int getWidth(Object obj) {
             Camera.Size size = (Camera.Size) obj;
             return size.width;
         }
 
+        @Override
         public int getHeight(Object obj) {
             Camera.Size size = (Camera.Size) obj;
             return size.height;
@@ -142,11 +146,25 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
                     /* Select the size that fits surface considering maximum size allowed */
                     Size frameSize = calculateCameraFrameSize(sizes, new JavaCameraSizeAccessor(), width, height);
 
-                    params.setPreviewFormat(ImageFormat.NV21);
+                    /* Image format NV21 causes issues in the Android emulators */
+                    if (Build.FINGERPRINT.startsWith("generic")
+                            || Build.FINGERPRINT.startsWith("unknown")
+                            || Build.MODEL.contains("google_sdk")
+                            || Build.MODEL.contains("Emulator")
+                            || Build.MODEL.contains("Android SDK built for x86")
+                            || Build.MANUFACTURER.contains("Genymotion")
+                            || (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
+                            || "google_sdk".equals(Build.PRODUCT))
+                        params.setPreviewFormat(ImageFormat.YV12);  // "generic" or "android" = android emulator
+                    else
+                        params.setPreviewFormat(ImageFormat.NV21);
+
+                    mPreviewFormat = params.getPreviewFormat();
+
                     Log.d(TAG, "Set preview size to " + Integer.valueOf((int)frameSize.width) + "x" + Integer.valueOf((int)frameSize.height));
                     params.setPreviewSize((int)frameSize.width, (int)frameSize.height);
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH && !android.os.Build.MODEL.equals("GT-I9100"))
                         params.setRecordingHint(true);
 
                     List<String> FocusModes = params.getSupportedFocusModes();
@@ -228,6 +246,8 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
         }
     }
 
+    private boolean mCameraFrameReady = false;
+
     @Override
     protected boolean connectCamera(int width, int height) {
 
@@ -239,6 +259,8 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
         if (!initializeCamera(width, height))
             return false;
 
+        mCameraFrameReady = false;
+
         /* now we can start update thread */
         Log.d(TAG, "Starting processing thread");
         mStopThread = false;
@@ -248,6 +270,7 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
         return true;
     }
 
+    @Override
     protected void disconnectCamera() {
         /* 1. We need to stop thread which updating the frames
          * 2. Stop camera and release it
@@ -259,7 +282,7 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
             synchronized (this) {
                 this.notify();
             }
-            Log.d(TAG, "Wating for thread");
+            Log.d(TAG, "Waiting for thread");
             if (mThread != null)
                 mThread.join();
         } catch (InterruptedException e) {
@@ -270,12 +293,17 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
 
         /* Now release camera */
         releaseCamera();
+
+        mCameraFrameReady = false;
     }
 
+    @Override
     public void onPreviewFrame(byte[] frame, Camera arg1) {
-        Log.d(TAG, "Preview Frame received. Frame size: " + frame.length);
+        if (BuildConfig.DEBUG)
+            Log.d(TAG, "Preview Frame received. Frame size: " + frame.length);
         synchronized (this) {
-            mFrameChain[1 - mChainIdx].put(0, 0, frame);
+            mFrameChain[mChainIdx].put(0, 0, frame);
+            mCameraFrameReady = true;
             this.notify();
         }
         if (mCamera != null)
@@ -283,12 +311,20 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
     }
 
     private class JavaCameraFrame implements CvCameraViewFrame {
+        @Override
         public Mat gray() {
             return mYuvFrameData.submat(0, mHeight, 0, mWidth);
         }
 
+        @Override
         public Mat rgba() {
-            Imgproc.cvtColor(mYuvFrameData, mRgba, Imgproc.COLOR_YUV2RGBA_NV21, 4);
+            if (mPreviewFormat == ImageFormat.NV21)
+                Imgproc.cvtColor(mYuvFrameData, mRgba, Imgproc.COLOR_YUV2RGBA_NV21, 4);
+            else if (mPreviewFormat == ImageFormat.YV12)
+                Imgproc.cvtColor(mYuvFrameData, mRgba, Imgproc.COLOR_YUV2RGB_I420, 4);  // COLOR_YUV2RGBA_YV12 produces inverted colors
+            else
+                throw new IllegalArgumentException("Preview Format can be NV21 or YV12");
+
             return mRgba;
         }
 
@@ -312,21 +348,29 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
 
     private class CameraWorker implements Runnable {
 
+        @Override
         public void run() {
             do {
+                boolean hasFrame = false;
                 synchronized (JavaCameraView.this) {
                     try {
-                        JavaCameraView.this.wait();
+                        while (!mCameraFrameReady && !mStopThread) {
+                            JavaCameraView.this.wait();
+                        }
                     } catch (InterruptedException e) {
-                        // TODO Auto-generated catch block
                         e.printStackTrace();
+                    }
+                    if (mCameraFrameReady)
+                    {
+                        mChainIdx = 1 - mChainIdx;
+                        mCameraFrameReady = false;
+                        hasFrame = true;
                     }
                 }
 
-                if (!mStopThread) {
-                    if (!mFrameChain[mChainIdx].empty())
-                        deliverAndDrawFrame(mCameraFrame[mChainIdx]);
-                    mChainIdx = 1 - mChainIdx;
+                if (!mStopThread && hasFrame) {
+                    if (!mFrameChain[1 - mChainIdx].empty())
+                        deliverAndDrawFrame(mCameraFrame[1 - mChainIdx]);
                 }
             } while (!mStopThread);
             Log.d(TAG, "Finish processing thread");

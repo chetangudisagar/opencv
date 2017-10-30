@@ -8,3 +8,17 @@
 Thumbs.db
 tags
 tegra/
+bin/
+*.sdf
+*.opensdf
+*.obj
+*.stamp
+*.depend
+*.rule
+*.tmp
+*/debug
+*.suo
+*.log
+*.tlog
+build
+.cache

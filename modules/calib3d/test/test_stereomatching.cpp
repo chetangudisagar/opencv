@@ -560,7 +560,7 @@ int CV_StereoMatchingTest::processStereoMatchingResults( FileStorage& fs, int ca
     {
         absdiff( trueRightDisp, Scalar(params.dispUnknVal), rightUnknMask );
         rightUnknMask = rightUnknMask < numeric_limits<float>::epsilon();
-        assert(leftUnknMask.type() == CV_8UC1);
+        assert(rightUnknMask.type() == CV_8UC1);
     }
 
     // calculate errors
@@ -742,7 +742,7 @@ protected:
     {
         int ndisp;
         int winSize;
-        bool fullDP;
+        int mode;
     };
     vector<RunParams> caseRunParams;
 
@@ -757,7 +757,7 @@ protected:
             RunParams params;
             String ndisp = fn[i+2]; params.ndisp = atoi(ndisp.c_str());
             String winSize = fn[i+3]; params.winSize = atoi(winSize.c_str());
-            String fullDP = fn[i+4]; params.fullDP = atoi(fullDP.c_str()) == 0 ? false : true;
+            String mode = fn[i+4]; params.mode = atoi(mode.c_str());
             caseNames.push_back( caseName );
             caseDatasets.push_back( datasetName );
             caseRunParams.push_back( params );
@@ -773,8 +773,7 @@ protected:
         Ptr<StereoSGBM> sgbm = StereoSGBM::create( 0, params.ndisp, params.winSize,
                                                  10*params.winSize*params.winSize,
                                                  40*params.winSize*params.winSize,
-                                                 1, 63, 10, 100, 32, params.fullDP ?
-                                                 StereoSGBM::MODE_HH : StereoSGBM::MODE_SGBM );
+                                                 1, 63, 10, 100, 32, params.mode );
         sgbm->compute( leftImg, rightImg, leftDisp );
         CV_Assert( leftDisp.type() == CV_16SC1 );
         leftDisp/=16;
@@ -785,3 +784,25 @@ protected:
 
 TEST(Calib3d_StereoBM, regression) { CV_StereoBMTest test; test.safe_run(); }
 TEST(Calib3d_StereoSGBM, regression) { CV_StereoSGBMTest test; test.safe_run(); }
+
+TEST(Calib3d_StereoSGBM_HH4, regression)
+{
+    String path = cvtest::TS::ptr()->get_data_path() + "cv/stereomatching/datasets/teddy/";
+    Mat leftImg = imread(path + "im2.png", 0);
+    ASSERT_FALSE(leftImg.empty());
+    Mat rightImg = imread(path + "im6.png", 0);
+    ASSERT_FALSE(rightImg.empty());
+    Mat testData = imread(path + "disp2_hh4.png",-1);
+    ASSERT_FALSE(testData.empty());
+    Mat leftDisp;
+    Mat toCheck;
+    {
+        Ptr<StereoSGBM> sgbm = StereoSGBM::create( 0, 48, 3, 90, 360, 1, 63, 10, 100, 32, StereoSGBM::MODE_HH4);
+        sgbm->compute( leftImg, rightImg, leftDisp);
+        CV_Assert( leftDisp.type() == CV_16SC1 );
+        leftDisp.convertTo(toCheck, CV_16UC1,1,16);
+    }
+    Mat diff;
+    absdiff(toCheck, testData,diff);
+    CV_Assert( countNonZero(diff)==0);
+}

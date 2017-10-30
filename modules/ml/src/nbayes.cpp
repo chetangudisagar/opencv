@@ -43,7 +43,6 @@
 namespace cv {
 namespace ml {
 
-NormalBayesClassifier::Params::Params() {}
 
 class NormalBayesClassifierImpl : public NormalBayesClassifier
 {
@@ -52,9 +51,6 @@ public:
     {
         nallvars = 0;
     }
-
-    void setParams(const Params&) {}
-    Params getParams() const { return Params(); }
 
     bool train( const Ptr<TrainData>& trainData, int flags )
     {
@@ -207,6 +203,7 @@ public:
             results = &_results;
             results_prob = !_results_prob.empty() ? &_results_prob : 0;
             rawOutput = _rawOutput;
+            value = 0;
         }
 
         const Mat* c;
@@ -240,7 +237,7 @@ public:
             if (results_prob)
             {
                 rptype = results_prob->type();
-                rpstep = results_prob->isContinuous() ? 1 : results_prob->step/results_prob->elemSize();
+                rpstep = results_prob->isContinuous() ? results_prob->cols : results_prob->step/results_prob->elemSize();
             }
             // allocate memory and initializing headers for calculating
             cv::AutoBuffer<double> _buffer(nvars*2);
@@ -317,7 +314,7 @@ public:
             CV_Error( CV_StsBadArg,
                      "The input samples must be 32f matrix with the number of columns = nallvars" );
 
-        if( samples.rows > 1 && _results.needed() )
+        if( (samples.rows > 1) && (! _results.needed()) )
             CV_Error( CV_StsNullPtr,
                      "When the number of input samples is >1, the output vector of results must be passed" );
 
@@ -346,6 +343,7 @@ public:
     {
         int nclasses = (int)cls_labels.total(), i;
 
+        writeFormat(fs);
         fs << "var_count" << (var_idx.empty() ? nallvars : (int)var_idx.total());
         fs << "var_all" << nallvars;
 
@@ -447,7 +445,7 @@ public:
     bool isTrained() const { return !avg.empty(); }
     bool isClassifier() const { return true; }
     int getVarCount() const { return nallvars; }
-    String getDefaultModelName() const { return "opencv_ml_nbayes"; }
+    String getDefaultName() const { return "opencv_ml_nbayes"; }
 
     int nallvars;
     Mat var_idx, cls_labels, c;
@@ -455,10 +453,15 @@ public:
 };
 
 
-Ptr<NormalBayesClassifier> NormalBayesClassifier::create(const Params&)
+Ptr<NormalBayesClassifier> NormalBayesClassifier::create()
 {
     Ptr<NormalBayesClassifierImpl> p = makePtr<NormalBayesClassifierImpl>();
     return p;
+}
+
+Ptr<NormalBayesClassifier> NormalBayesClassifier::load(const String& filepath, const String& nodeName)
+{
+    return Algorithm::load<NormalBayesClassifier>(filepath, nodeName);
 }
 
 }

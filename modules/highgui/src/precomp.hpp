@@ -47,11 +47,11 @@
 #include "opencv2/core/utility.hpp"
 #include "opencv2/core/private.hpp"
 
-#include "opencv2/imgcodecs.hpp"
-
 #include "opencv2/imgproc/imgproc_c.h"
-#include "opencv2/imgcodecs/imgcodecs_c.h"
 #include "opencv2/highgui/highgui_c.h"
+
+#include "opencv2/imgcodecs.hpp"
+#include "opencv2/imgcodecs/imgcodecs_c.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -60,15 +60,7 @@
 #include <ctype.h>
 #include <assert.h>
 
-#if defined WIN32 || defined WINCE
-    #if !defined _WIN32_WINNT
-        #ifdef HAVE_MSMF
-            #define _WIN32_WINNT 0x0600 // Windows Vista
-        #else
-            #define _WIN32_WINNT 0x0500 // Windows 2000
-        #endif
-    #endif
-
+#if defined _WIN32 || defined WINCE
     #include <windows.h>
     #undef small
     #undef min
@@ -95,16 +87,18 @@
 #define CV_WINDOW_MAGIC_VAL     0x00420042
 #define CV_TRACKBAR_MAGIC_VAL   0x00420043
 
-//Yannick Verdie 2010
+//Yannick Verdie 2010, Max Kostin 2015
 void cvSetModeWindow_W32(const char* name, double prop_value);
 void cvSetModeWindow_GTK(const char* name, double prop_value);
 void cvSetModeWindow_CARBON(const char* name, double prop_value);
 void cvSetModeWindow_COCOA(const char* name, double prop_value);
+void cvSetModeWindow_WinRT(const char* name, double prop_value);
 
 double cvGetModeWindow_W32(const char* name);
 double cvGetModeWindow_GTK(const char* name);
 double cvGetModeWindow_CARBON(const char* name);
 double cvGetModeWindow_COCOA(const char* name);
+double cvGetModeWindow_WinRT(const char* name);
 
 double cvGetPropWindowAutoSize_W32(const char* name);
 double cvGetPropWindowAutoSize_GTK(const char* name);
@@ -127,6 +121,7 @@ double cvGetRatioWindow_QT(const char* name);
 void cvSetRatioWindow_QT(const char* name,double prop_value);
 
 double cvGetOpenGlProp_QT(const char* name);
+double cvGetPropVisible_QT(const char* name);
 #endif
 
 #endif /* __HIGHGUI_H_ */

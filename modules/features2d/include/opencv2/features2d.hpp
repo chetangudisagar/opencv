@@ -40,11 +40,15 @@
 //
 //M*/
 
-#ifndef __OPENCV_FEATURES_2D_HPP__
-#define __OPENCV_FEATURES_2D_HPP__
+#ifndef OPENCV_FEATURES_2D_HPP
+#define OPENCV_FEATURES_2D_HPP
 
+#include "opencv2/opencv_modules.hpp"
 #include "opencv2/core.hpp"
+
+#ifdef HAVE_OPENCV_FLANN
 #include "opencv2/flann/miniflann.hpp"
+#endif
 
 /**
   @defgroup features2d 2D Features Framework
@@ -74,7 +78,7 @@ This section describes approaches based on local 2D features and used to categor
    -   A complete Bag-Of-Words sample can be found at
         opencv_source_code/samples/cpp/bagofwords_classification.cpp
     -   (Python) An example using the features2D framework to perform object categorization can be
-        found at opencv_source_code/samples/python2/find_obj.py
+        found at opencv_source_code/samples/python/find_obj.py
 
   @}
  */
@@ -117,6 +121,10 @@ public:
      * Remove duplicated keypoints.
      */
     static void removeDuplicated( std::vector<KeyPoint>& keypoints );
+    /*
+     * Remove duplicated keypoints and sort the remaining keypoints
+     */
+    static void removeDuplicatedSorted( std::vector<KeyPoint>& keypoints );
 
     /*
      * Retain the specified number of the best keypoints (according to the response)
@@ -153,8 +161,8 @@ public:
     @param masks Masks for each input image specifying where to look for keypoints (optional).
     masks[i] is a mask for images[i].
     */
-    virtual void detect( InputArrayOfArrays images,
-                         std::vector<std::vector<KeyPoint> >& keypoints,
+    CV_WRAP virtual void detect( InputArrayOfArrays images,
+                         CV_OUT std::vector<std::vector<KeyPoint> >& keypoints,
                          InputArrayOfArrays masks=noArray() );
 
     /** @brief Computes the descriptors for a set of keypoints detected in an image (first variant) or image set
@@ -182,8 +190,8 @@ public:
     descriptors computed for a keypoints[i]. Row j is the keypoints (or keypoints[i]) is the
     descriptor for keypoint j-th keypoint.
     */
-    virtual void compute( InputArrayOfArrays images,
-                          std::vector<std::vector<KeyPoint> >& keypoints,
+    CV_WRAP virtual void compute( InputArrayOfArrays images,
+                          CV_OUT CV_IN_OUT std::vector<std::vector<KeyPoint> >& keypoints,
                           OutputArrayOfArrays descriptors );
 
     /** Detects keypoints and computes the descriptors */
@@ -196,8 +204,17 @@ public:
     CV_WRAP virtual int descriptorType() const;
     CV_WRAP virtual int defaultNorm() const;
 
+    CV_WRAP void write( const String& fileName ) const;
+
+    CV_WRAP void read( const String& fileName );
+
+    virtual void write( FileStorage&) const;
+
+    virtual void read( const FileNode&);
+
     //! Return true if detector object is empty
     CV_WRAP virtual bool empty() const;
+    CV_WRAP virtual String getDefaultName() const;
 };
 
 /** Feature detectors in OpenCV have wrappers with a common interface that enables you to easily switch
@@ -222,7 +239,7 @@ class CV_EXPORTS_W BRISK : public Feature2D
 public:
     /** @brief The BRISK constructor
 
-    @param thresh FAST/AGAST detection threshold score.
+    @param thresh AGAST detection threshold score.
     @param octaves detection octaves. Use 0 to do single scale.
     @param patternScale apply this scale to the pattern used for sampling the neighbourhood of a
     keypoint.
@@ -242,6 +259,24 @@ public:
     @param indexChange index remapping of the bits. */
     CV_WRAP static Ptr<BRISK> create(const std::vector<float> &radiusList, const std::vector<int> &numberList,
         float dMax=5.85f, float dMin=8.2f, const std::vector<int>& indexChange=std::vector<int>());
+
+    /** @brief The BRISK constructor for a custom pattern, detection threshold and octaves
+
+    @param thresh AGAST detection threshold score.
+    @param octaves detection octaves. Use 0 to do single scale.
+    @param radiusList defines the radii (in pixels) where the samples around a keypoint are taken (for
+    keypoint scale 1).
+    @param numberList defines the number of sampling points on the sampling circle. Must be the same
+    size as radiusList..
+    @param dMax threshold for the short pairings used for descriptor formation (in pixels for keypoint
+    scale 1).
+    @param dMin threshold for the long pairings used for orientation determination (in pixels for
+    keypoint scale 1).
+    @param indexChange index remapping of the bits. */
+    CV_WRAP static Ptr<BRISK> create(int thresh, int octaves, const std::vector<float> &radiusList,
+        const std::vector<int> &numberList, float dMax=5.85f, float dMin=8.2f,
+        const std::vector<int>& indexChange=std::vector<int>());
+    CV_WRAP virtual String getDefaultName() const;
 };
 
 /** @brief Class implementing the ORB (*oriented BRIEF*) keypoint detector and descriptor extractor
@@ -315,30 +350,54 @@ public:
 
     CV_WRAP virtual void setFastThreshold(int fastThreshold) = 0;
     CV_WRAP virtual int getFastThreshold() const = 0;
+    CV_WRAP virtual String getDefaultName() const;
 };
 
-/** @brief Maximally stable extremal region extractor. :
+/** @brief Maximally stable extremal region extractor
 
-The class encapsulates all the parameters of the MSER extraction algorithm (see
-<http://en.wikipedia.org/wiki/Maximally_stable_extremal_regions>). Also see
-<http://code.opencv.org/projects/opencv/wiki/MSER> for useful comments and parameters description.
+The class encapsulates all the parameters of the %MSER extraction algorithm (see [wiki
+article](http://en.wikipedia.org/wiki/Maximally_stable_extremal_regions)).
 
-@note
-   -   (Python) A complete example showing the use of the MSER detector can be found at
-        opencv_source_code/samples/python2/mser.py
- */
+- there are two different implementation of %MSER: one for grey image, one for color image
+
+- the grey image algorithm is taken from: @cite nister2008linear ;  the paper claims to be faster
+than union-find method; it actually get 1.5~2m/s on my centrino L7200 1.2GHz laptop.
+
+- the color image algorithm is taken from: @cite forssen2007maximally ; it should be much slower
+than grey image method ( 3~4 times ); the chi_table.h file is taken directly from paper's source
+code which is distributed under GPL.
+
+- (Python) A complete example showing the use of the %MSER detector can be found at samples/python/mser.py
+*/
 class CV_EXPORTS_W MSER : public Feature2D
 {
 public:
-    //! the full constructor
+    /** @brief Full consturctor for %MSER detector
+
+    @param _delta it compares \f$(size_{i}-size_{i-delta})/size_{i-delta}\f$
+    @param _min_area prune the area which smaller than minArea
+    @param _max_area prune the area which bigger than maxArea
+    @param _max_variation prune the area have simliar size to its children
+    @param _min_diversity for color image, trace back to cut off mser with diversity less than min_diversity
+    @param _max_evolution  for color image, the evolution steps
+    @param _area_threshold for color image, the area threshold to cause re-initialize
+    @param _min_margin for color image, ignore too small margin
+    @param _edge_blur_size for color image, the aperture size for edge blur
+     */
     CV_WRAP static Ptr<MSER> create( int _delta=5, int _min_area=60, int _max_area=14400,
           double _max_variation=0.25, double _min_diversity=.2,
           int _max_evolution=200, double _area_threshold=1.01,
           double _min_margin=0.003, int _edge_blur_size=5 );
 
+    /** @brief Detect %MSER regions
+
+    @param image input image (8UC1, 8UC3 or 8UC4, must be greater or equal than 3x3)
+    @param msers resulting list of point sets
+    @param bboxes resulting bounding boxes
+    */
     CV_WRAP virtual void detectRegions( InputArray image,
                                         CV_OUT std::vector<std::vector<Point> >& msers,
-                                        std::vector<Rect>& bboxes ) = 0;
+                                        CV_OUT std::vector<Rect>& bboxes ) = 0;
 
     CV_WRAP virtual void setDelta(int delta) = 0;
     CV_WRAP virtual int getDelta() const = 0;
@@ -351,6 +410,7 @@ public:
 
     CV_WRAP virtual void setPass2Only(bool f) = 0;
     CV_WRAP virtual bool getPass2Only() const = 0;
+    CV_WRAP virtual String getDefaultName() const;
 };
 
 /** @overload */
@@ -406,6 +466,62 @@ public:
 
     CV_WRAP virtual void setType(int type) = 0;
     CV_WRAP virtual int getType() const = 0;
+    CV_WRAP virtual String getDefaultName() const;
+};
+
+/** @overload */
+CV_EXPORTS void AGAST( InputArray image, CV_OUT std::vector<KeyPoint>& keypoints,
+                      int threshold, bool nonmaxSuppression=true );
+
+/** @brief Detects corners using the AGAST algorithm
+
+@param image grayscale image where keypoints (corners) are detected.
+@param keypoints keypoints detected on the image.
+@param threshold threshold on difference between intensity of the central pixel and pixels of a
+circle around this pixel.
+@param nonmaxSuppression if true, non-maximum suppression is applied to detected corners
+(keypoints).
+@param type one of the four neighborhoods as defined in the paper:
+AgastFeatureDetector::AGAST_5_8, AgastFeatureDetector::AGAST_7_12d,
+AgastFeatureDetector::AGAST_7_12s, AgastFeatureDetector::OAST_9_16
+
+For non-Intel platforms, there is a tree optimised variant of AGAST with same numerical results.
+The 32-bit binary tree tables were generated automatically from original code using perl script.
+The perl script and examples of tree generation are placed in features2d/doc folder.
+Detects corners using the AGAST algorithm by @cite mair2010_agast .
+
+ */
+CV_EXPORTS void AGAST( InputArray image, CV_OUT std::vector<KeyPoint>& keypoints,
+                      int threshold, bool nonmaxSuppression, int type );
+//! @} features2d_main
+
+//! @addtogroup features2d_main
+//! @{
+
+/** @brief Wrapping class for feature detection using the AGAST method. :
+ */
+class CV_EXPORTS_W AgastFeatureDetector : public Feature2D
+{
+public:
+    enum
+    {
+        AGAST_5_8 = 0, AGAST_7_12d = 1, AGAST_7_12s = 2, OAST_9_16 = 3,
+        THRESHOLD = 10000, NONMAX_SUPPRESSION = 10001,
+    };
+
+    CV_WRAP static Ptr<AgastFeatureDetector> create( int threshold=10,
+                                                     bool nonmaxSuppression=true,
+                                                     int type=AgastFeatureDetector::OAST_9_16 );
+
+    CV_WRAP virtual void setThreshold(int threshold) = 0;
+    CV_WRAP virtual int getThreshold() const = 0;
+
+    CV_WRAP virtual void setNonmaxSuppression(bool f) = 0;
+    CV_WRAP virtual bool getNonmaxSuppression() const = 0;
+
+    CV_WRAP virtual void setType(int type) = 0;
+    CV_WRAP virtual int getType() const = 0;
+    CV_WRAP virtual String getDefaultName() const;
 };
 
 /** @brief Wrapping class for feature detection using the goodFeaturesToTrack function. :
@@ -415,6 +531,8 @@ class CV_EXPORTS_W GFTTDetector : public Feature2D
 public:
     CV_WRAP static Ptr<GFTTDetector> create( int maxCorners=1000, double qualityLevel=0.01, double minDistance=1,
                                              int blockSize=3, bool useHarrisDetector=false, double k=0.04 );
+    CV_WRAP static Ptr<GFTTDetector> create( int maxCorners, double qualityLevel, double minDistance,
+                                             int blockSize, int gradiantSize, bool useHarrisDetector=false, double k=0.04 );
     CV_WRAP virtual void setMaxFeatures(int maxFeatures) = 0;
     CV_WRAP virtual int getMaxFeatures() const = 0;
 
@@ -432,6 +550,7 @@ public:
 
     CV_WRAP virtual void setK(double k) = 0;
     CV_WRAP virtual double getK() const = 0;
+    CV_WRAP virtual String getDefaultName() const;
 };
 
 /** @brief Class for extracting blobs from an image. :
@@ -498,6 +617,7 @@ public:
 
   CV_WRAP static Ptr<SimpleBlobDetector>
     create(const SimpleBlobDetector::Params &parameters = SimpleBlobDetector::Params());
+  CV_WRAP virtual String getDefaultName() const;
 };
 
 //! @} features2d_main
@@ -554,15 +674,25 @@ public:
 
     CV_WRAP virtual void setDiffusivity(int diff) = 0;
     CV_WRAP virtual int getDiffusivity() const = 0;
+    CV_WRAP virtual String getDefaultName() const;
 };
 
-/** @brief Class implementing the AKAZE keypoint detector and descriptor extractor, described in @cite ANB13 . :
+/** @brief Class implementing the AKAZE keypoint detector and descriptor extractor, described in @cite ANB13.
 
-@note AKAZE descriptors can only be used with KAZE or AKAZE keypoints. Try to avoid using *extract*
-and *detect* instead of *operator()* due to performance reasons. .. [ANB13] Fast Explicit Diffusion
-for Accelerated Features in Nonlinear Scale Spaces. Pablo F. Alcantarilla, Jesús Nuevo and Adrien
-Bartoli. In British Machine Vision Conference (BMVC), Bristol, UK, September 2013.
- */
+@details AKAZE descriptors can only be used with KAZE or AKAZE keypoints. This class is thread-safe.
+
+@note When you need descriptors use Feature2D::detectAndCompute, which
+provides better performance. When using Feature2D::detect followed by
+Feature2D::compute scale space pyramid is computed twice.
+
+@note AKAZE implements T-API. When image is passed as UMat some parts of the algorithm
+will use OpenCL.
+
+@note [ANB13] Fast Explicit Diffusion for Accelerated Features in Nonlinear
+Scale Spaces. Pablo F. Alcantarilla, Jesús Nuevo and Adrien Bartoli. In
+British Machine Vision Conference (BMVC), Bristol, UK, September 2013.
+
+*/
 class CV_EXPORTS_W AKAZE : public Feature2D
 {
 public:
@@ -612,6 +742,7 @@ public:
 
     CV_WRAP virtual void setDiffusivity(int diff) = 0;
     CV_WRAP virtual int getDiffusivity() const = 0;
+    CV_WRAP virtual String getDefaultName() const;
 };
 
 //! @} features2d_main
@@ -679,38 +810,6 @@ struct CV_EXPORTS L1
     }
 };
 
-/*
- * Hamming distance functor - counts the bit differences between two strings - useful for the Brief descriptor
- * bit count of A exclusive XOR'ed with B
- */
-struct CV_EXPORTS Hamming
-{
-    enum { normType = NORM_HAMMING };
-    typedef unsigned char ValueType;
-    typedef int ResultType;
-
-    /** this will count the bits in a ^ b
-     */
-    ResultType operator()( const unsigned char* a, const unsigned char* b, int size ) const
-    {
-        return normHamming(a, b, size);
-    }
-};
-
-typedef Hamming HammingLUT;
-
-template<int cellsize> struct HammingMultilevel
-{
-    enum { normType = NORM_HAMMING + (cellsize>1) };
-    typedef unsigned char ValueType;
-    typedef int ResultType;
-
-    ResultType operator()( const unsigned char* a, const unsigned char* b, int size ) const
-    {
-        return normHamming(a, b, size, cellsize);
-    }
-};
-
 /****************************************************************************************\
 *                                  DescriptorMatcher                                     *
 \****************************************************************************************/
@@ -726,6 +825,15 @@ an image set.
 class CV_EXPORTS_W DescriptorMatcher : public Algorithm
 {
 public:
+   enum
+    {
+        FLANNBASED            = 1,
+        BRUTEFORCE            = 2,
+        BRUTEFORCE_L1         = 3,
+        BRUTEFORCE_HAMMING    = 4,
+        BRUTEFORCE_HAMMINGLUT = 5,
+        BRUTEFORCE_SL2        = 6
+    };
     virtual ~DescriptorMatcher();
 
     /** @brief Adds descriptors to train a CPU(trainDescCollectionis) or GPU(utrainDescCollectionis) descriptor
@@ -823,8 +931,8 @@ public:
     query descriptor and the training descriptor is equal or smaller than maxDistance. Found matches are
     returned in the distance increasing order.
      */
-    void radiusMatch( InputArray queryDescriptors, InputArray trainDescriptors,
-                      std::vector<std::vector<DMatch> >& matches, float maxDistance,
+    CV_WRAP void radiusMatch( InputArray queryDescriptors, InputArray trainDescriptors,
+                      CV_OUT std::vector<std::vector<DMatch> >& matches, float maxDistance,
                       InputArray mask=noArray(), bool compactResult=false ) const;
 
     /** @overload
@@ -861,9 +969,21 @@ public:
     false, the matches vector has the same size as queryDescriptors rows. If compactResult is true,
     the matches vector does not contain matches for fully masked-out query descriptors.
     */
-    void radiusMatch( InputArray queryDescriptors, std::vector<std::vector<DMatch> >& matches, float maxDistance,
+    CV_WRAP void radiusMatch( InputArray queryDescriptors, CV_OUT std::vector<std::vector<DMatch> >& matches, float maxDistance,
                       InputArrayOfArrays masks=noArray(), bool compactResult=false );
 
+
+    CV_WRAP void write( const String& fileName ) const
+    {
+        FileStorage fs(fileName, FileStorage::WRITE);
+        write(fs);
+    }
+
+    CV_WRAP void read( const String& fileName )
+    {
+        FileStorage fs(fileName, FileStorage::READ);
+        read(fs.root());
+    }
     // Reads matcher object from a file node
     virtual void read( const FileNode& );
     // Writes matcher object to a file storage
@@ -875,7 +995,7 @@ public:
     that is, copies both parameters and train data. If emptyTrainData is true, the method creates an
     object copy with the current parameters but with empty train data.
      */
-    virtual Ptr<DescriptorMatcher> clone( bool emptyTrainData=false ) const = 0;
+    CV_WRAP virtual Ptr<DescriptorMatcher> clone( bool emptyTrainData=false ) const = 0;
 
     /** @brief Creates a descriptor matcher of a given type with the default parameters (using default
     constructor).
@@ -889,6 +1009,9 @@ public:
     -   `FlannBased`
      */
     CV_WRAP static Ptr<DescriptorMatcher> create( const String& descriptorMatcherType );
+
+    CV_WRAP static Ptr<DescriptorMatcher> create( int matcherType );
+
 protected:
     /**
      * Class to work with descriptors from several images as with one merged matrix.
@@ -945,8 +1068,17 @@ sets.
 class CV_EXPORTS_W BFMatcher : public DescriptorMatcher
 {
 public:
-    /** @brief Brute-force matcher constructor.
+    /** @brief Brute-force matcher constructor (obsolete). Please use BFMatcher.create()
+     *
+     *
+    */
+    CV_WRAP BFMatcher( int normType=NORM_L2, bool crossCheck=false );
 
+    virtual ~BFMatcher() {}
+
+    virtual bool isMaskSupported() const { return true; }
+
+    /** @brief Brute-force matcher create method.
     @param normType One of NORM_L1, NORM_L2, NORM_HAMMING, NORM_HAMMING2. L1 and L2 norms are
     preferable choices for SIFT and SURF descriptors, NORM_HAMMING should be used with ORB, BRISK and
     BRIEF, NORM_HAMMING2 should be used with ORB when WTA_K==3 or 4 (see ORB::ORB constructor
@@ -958,10 +1090,7 @@ public:
     pairs. Such technique usually produces best results with minimal number of outliers when there are
     enough matches. This is alternative to the ratio test, used by D. Lowe in SIFT paper.
      */
-    CV_WRAP BFMatcher( int normType=NORM_L2, bool crossCheck=false );
-    virtual ~BFMatcher() {}
-
-    virtual bool isMaskSupported() const { return true; }
+    CV_WRAP static Ptr<BFMatcher> create( int normType=NORM_L2, bool crossCheck=false ) ;
 
     virtual Ptr<DescriptorMatcher> clone( bool emptyTrainData=false ) const;
 protected:
@@ -974,10 +1103,11 @@ protected:
     bool crossCheck;
 };
 
+#if defined(HAVE_OPENCV_FLANN) || defined(CV_DOXYGEN)
 
 /** @brief Flann-based descriptor matcher.
 
-This matcher trains flann::Index_ on a train descriptor collection and calls its nearest search
+This matcher trains cv::flann::Index on a train descriptor collection and calls its nearest search
 methods to find the best matches. So, this matcher may be faster when matching a large train
 collection than the brute force matcher. FlannBasedMatcher does not support masking permissible
 matches of descriptor sets because flann::Index does not support this. :
@@ -999,6 +1129,8 @@ public:
     virtual void train();
     virtual bool isMaskSupported() const;
 
+    CV_WRAP static Ptr<FlannBasedMatcher> create();
+
     virtual Ptr<DescriptorMatcher> clone( bool emptyTrainData=false ) const;
 protected:
     static void convertToDMatches( const DescriptorCollection& descriptors,
@@ -1017,6 +1149,8 @@ protected:
     DescriptorCollection mergedDescriptors;
     int addedDescCount;
 };
+
+#endif
 
 //! @} features2d_match
 

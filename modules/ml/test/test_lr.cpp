@@ -64,6 +64,7 @@ using namespace cv::ml;
 
 static bool calculateError( const Mat& _p_labels, const Mat& _o_labels, float& error)
 {
+    CV_TRACE_FUNCTION();
     error = 0.0f;
     float accuracy = 0.0f;
     Mat _p_labels_temp;
@@ -91,20 +92,23 @@ protected:
 
 void CV_LRTest::run( int /*start_from*/ )
 {
+    CV_TRACE_FUNCTION();
     // initialize varibles from the popular Iris Dataset
     string dataFileName = ts->get_data_path() + "iris.data";
     Ptr<TrainData> tdata = TrainData::loadFromCSV(dataFileName, 0);
 
-    LogisticRegression::Params params = LogisticRegression::Params();
-    params.alpha = 1.0;
-    params.num_iters = 10001;
-    params.norm = LogisticRegression::REG_L2;
-    params.regularized = 1;
-    params.train_method = LogisticRegression::BATCH;
-    params.mini_batch_size = 10;
+    if (tdata.empty()) {
+        ts->set_failed_test_info(cvtest::TS::FAIL_INVALID_TEST_DATA);
+        return;
+    }
 
     // run LR classifier train classifier
-    Ptr<LogisticRegression> p = LogisticRegression::create(params);
+    Ptr<LogisticRegression> p = LogisticRegression::create();
+    p->setLearningRate(1.0);
+    p->setIterations(10001);
+    p->setRegularization(LogisticRegression::REG_L2);
+    p->setTrainMethod(LogisticRegression::BATCH);
+    p->setMiniBatchSize(10);
     p->train(tdata);
 
     // predict using the same data
@@ -148,6 +152,7 @@ protected:
 
 void CV_LRTest_SaveLoad::run( int /*start_from*/ )
 {
+    CV_TRACE_FUNCTION();
     int code = cvtest::TS::OK;
 
     // initialize varibles from the popular Iris Dataset
@@ -157,20 +162,17 @@ void CV_LRTest_SaveLoad::run( int /*start_from*/ )
     Mat responses1, responses2;
     Mat learnt_mat1, learnt_mat2;
 
-    LogisticRegression::Params params1 = LogisticRegression::Params();
-    params1.alpha = 1.0;
-    params1.num_iters = 10001;
-    params1.norm = LogisticRegression::REG_L2;
-    params1.regularized = 1;
-    params1.train_method = LogisticRegression::BATCH;
-    params1.mini_batch_size = 10;
-
     // train and save the classifier
     String filename = tempfile(".xml");
     try
     {
         // run LR classifier train classifier
-        Ptr<LogisticRegression> lr1 = LogisticRegression::create(params1);
+        Ptr<LogisticRegression> lr1 = LogisticRegression::create();
+        lr1->setLearningRate(1.0);
+        lr1->setIterations(10001);
+        lr1->setRegularization(LogisticRegression::REG_L2);
+        lr1->setTrainMethod(LogisticRegression::BATCH);
+        lr1->setMiniBatchSize(10);
         lr1->train(tdata);
         lr1->predict(tdata->getSamples(), responses1);
         learnt_mat1 = lr1->get_learnt_thetas();
@@ -185,7 +187,7 @@ void CV_LRTest_SaveLoad::run( int /*start_from*/ )
     // and load to another
     try
     {
-        Ptr<LogisticRegression> lr2 = StatModel::load<LogisticRegression>(filename);
+        Ptr<LogisticRegression> lr2 = Algorithm::load<LogisticRegression>(filename);
         lr2->predict(tdata->getSamples(), responses2);
         learnt_mat2 = lr2->get_learnt_thetas();
     }

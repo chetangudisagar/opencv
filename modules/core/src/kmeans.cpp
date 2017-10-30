@@ -74,12 +74,13 @@ public:
 
     void operator()( const cv::Range& range ) const
     {
+        CV_TRACE_FUNCTION();
         const int begin = range.start;
         const int end = range.end;
 
         for ( int i = begin; i<end; i++ )
         {
-            tdist2[i] = std::min(normL2Sqr_(data + step*i, data + stepci, dims), dist[i]);
+            tdist2[i] = std::min(normL2Sqr(data + step*i, data + stepci, dims), dist[i]);
         }
     }
 
@@ -101,6 +102,7 @@ Arthur & Vassilvitskii (2007) k-means++: The Advantages of Careful Seeding
 static void generateCentersPP(const Mat& _data, Mat& _out_centers,
                               int K, RNG& rng, int trials)
 {
+    CV_TRACE_FUNCTION();
     int i, j, k, dims = _data.cols, N = _data.rows;
     const float* data = _data.ptr<float>(0);
     size_t step = _data.step/sizeof(data[0]);
@@ -114,7 +116,7 @@ static void generateCentersPP(const Mat& _data, Mat& _out_centers,
 
     for( i = 0; i < N; i++ )
     {
-        dist[i] = normL2Sqr_(data + step*i, data + step*centers[0], dims);
+        dist[i] = normL2Sqr(data + step*i, data + step*centers[0], dims);
         sum0 += dist[i];
     }
 
@@ -165,11 +167,13 @@ public:
     KMeansDistanceComputer( double *_distances,
                             int *_labels,
                             const Mat& _data,
-                            const Mat& _centers )
+                            const Mat& _centers,
+                            bool _onlyDistance = false )
         : distances(_distances),
           labels(_labels),
           data(_data),
-          centers(_centers)
+          centers(_centers),
+          onlyDistance(_onlyDistance)
     {
     }
 
@@ -180,17 +184,22 @@ public:
         const int K = centers.rows;
         const int dims = centers.cols;
 
-        const float *sample;
         for( int i = begin; i<end; ++i)
         {
-            sample = data.ptr<float>(i);
+            const float *sample = data.ptr<float>(i);
+            if (onlyDistance)
+            {
+                const float* center = centers.ptr<float>(labels[i]);
+                distances[i] = normL2Sqr(sample, center, dims);
+                continue;
+            }
             int k_best = 0;
             double min_dist = DBL_MAX;
 
             for( int k = 0; k < K; k++ )
             {
                 const float* center = centers.ptr<float>(k);
-                const double dist = normL2Sqr_(sample, center, dims);
+                const double dist = normL2Sqr(sample, center, dims);
 
                 if( min_dist > dist )
                 {
@@ -211,6 +220,7 @@ private:
     int *labels;
     const Mat& data;
     const Mat& centers;
+    bool onlyDistance;
 };
 
 }
@@ -220,11 +230,13 @@ double cv::kmeans( InputArray _data, int K,
                    TermCriteria criteria, int attempts,
                    int flags, OutputArray _centers )
 {
+    CV_INSTRUMENT_REGION()
+
     const int SPP_TRIALS = 3;
     Mat data0 = _data.getMat();
-    bool isrow = data0.rows == 1 && data0.channels() > 1;
-    int N = !isrow ? data0.rows : data0.cols;
-    int dims = (!isrow ? data0.cols : 1)*data0.channels();
+    bool isrow = data0.rows == 1;
+    int N = isrow ? data0.cols : data0.rows;
+    int dims = (isrow ? 1 : data0.cols)*data0.channels();
     int type = data0.depth();
 
     attempts = std::max(attempts, 1);
@@ -258,6 +270,7 @@ double cv::kmeans( InputArray _data, int K,
     Mat centers(K, dims, type), old_centers(K, dims, type), temp(1, dims, type);
     std::vector<int> counters(K);
     std::vector<Vec2f> _box(dims);
+    Mat dists(1, N, CV_64F);
     Vec2f* box = &_box[0];
     double best_compactness = DBL_MAX, compactness = 0;
     RNG& rng = theRNG();
@@ -385,7 +398,7 @@ double cv::kmeans( InputArray _data, int K,
                         if( labels[i] != max_k )
                             continue;
                         sample = data.ptr<float>(i);
-                        double dist = normL2Sqr_(sample, _old_center, dims);
+                        double dist = normL2Sqr(sample, _old_center, dims);
 
                         if( max_dist <= dist )
                         {
@@ -429,19 +442,16 @@ double cv::kmeans( InputArray _data, int K,
                 }
             }
 
-            if( ++iter == MAX(criteria.maxCount, 2) || max_center_shift <= criteria.epsilon )
-                break;
+            bool isLastIter = (++iter == MAX(criteria.maxCount, 2) || max_center_shift <= criteria.epsilon);
 
             // assign labels
-            Mat dists(1, N, CV_64F);
+            dists = 0;
             double* dist = dists.ptr<double>(0);
-            parallel_for_(Range(0, N),
-                         KMeansDistanceComputer(dist, labels, data, centers));
-            compactness = 0;
-            for( i = 0; i < N; i++ )
-            {
-                compactness += dist[i];
-            }
+            parallel_for_(Range(0, N), KMeansDistanceComputer(dist, labels, data, centers, isLastIter));
+            compactness = sum(dists)[0];
+
+            if (isLastIter)
+                break;
         }
 
         if( compactness < best_compactness )

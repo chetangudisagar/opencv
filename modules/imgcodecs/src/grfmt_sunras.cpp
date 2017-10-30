@@ -54,6 +54,10 @@ SunRasterDecoder::SunRasterDecoder()
 {
     m_offset = -1;
     m_signature = fmtSignSunRas;
+    m_bpp = 0;
+    m_encoding = RAS_STANDARD;
+    m_maptype = RMT_NONE;
+    m_maplength = 0;
 }
 
 
@@ -96,7 +100,7 @@ bool  SunRasterDecoder::readHeader()
             (m_encoding == RAS_OLD || m_encoding == RAS_STANDARD ||
              (m_type == RAS_BYTE_ENCODED && m_bpp == 8) || m_type == RAS_FORMAT_RGB) &&
             ((m_maptype == RMT_NONE && m_maplength == 0) ||
-             (m_maptype == RMT_EQUAL_RGB && m_maplength <= palSize && m_bpp <= 8)))
+             (m_maptype == RMT_EQUAL_RGB && m_maplength <= palSize && m_maplength > 0 && m_bpp <= 8)))
         {
             memset( m_palette, 0, sizeof(m_palette));
 
@@ -156,8 +160,8 @@ bool  SunRasterDecoder::readData( Mat& img )
 {
     int color = img.channels() > 1;
     uchar* data = img.ptr();
-    int step = (int)img.step;
-    uchar  gray_palette[256];
+    size_t step = img.step;
+    uchar  gray_palette[256] = {0};
     bool   result = false;
     int  src_pitch = ((m_width*m_bpp + 7)/8 + 1) & -2;
     int  nch = color ? 3 : 1;
@@ -304,11 +308,11 @@ bad_decoding_1bpp:
                         code = m_strm.getByte();
 
                         if( color )
-                            data = FillUniColor( data, line_end, step, width3,
+                            data = FillUniColor( data, line_end, validateToInt(step), width3,
                                                  y, m_height, len,
                                                  m_palette[code] );
                         else
-                            data = FillUniGray( data, line_end, step, width3,
+                            data = FillUniGray( data, line_end, validateToInt(step), width3,
                                                 y, m_height, len,
                                                 gray_palette[code] );
                         if( y >= m_height )

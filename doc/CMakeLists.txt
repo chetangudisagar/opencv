@@ -2,7 +2,11 @@
 #  CMake file for OpenCV docs
 #-----------------------
 
-set(HAVE_DOC_GENERATOR BUILD_DOCS AND DOXYGEN_FOUND)
+if(BUILD_DOCS AND DOXYGEN_FOUND)
+  set(HAVE_DOC_GENERATOR TRUE)
+else()
+  set(HAVE_DOC_GENERATOR FALSE)
+endif()
 
 if(HAVE_DOC_GENERATOR)
   project(opencv_docs)
@@ -20,25 +24,20 @@ if(HAVE_DOC_GENERATOR)
   endforeach()
   ocv_list_sort(BASE_MODULES)
   ocv_list_sort(EXTRA_MODULES)
-  set(FIXED_ORDER_MODULES core imgproc imgcodecs videoio highgui video calib3d features2d objdetect ml flann photo stitching)
+  set(FIXED_ORDER_MODULES core imgproc imgcodecs videoio highgui video calib3d features2d objdetect dnn ml flann photo stitching)
   list(REMOVE_ITEM BASE_MODULES ${FIXED_ORDER_MODULES})
   set(BASE_MODULES ${FIXED_ORDER_MODULES} ${BASE_MODULES})
-
-  set(DOC_LIST
-      "${OpenCV_SOURCE_DIR}/doc/opencv-logo.png"
-      "${OpenCV_SOURCE_DIR}/doc/opencv-logo2.png"
-      "${OpenCV_SOURCE_DIR}/doc/opencv-logo-white.png"
-      "${OpenCV_SOURCE_DIR}/doc/opencv.ico"
-      "${OpenCV_SOURCE_DIR}/doc/pattern.png"
-      "${OpenCV_SOURCE_DIR}/doc/acircles_pattern.png")
-  set(OPTIONAL_DOC_LIST "")
 endif(HAVE_DOC_GENERATOR)
 
 # ========= Doxygen docs =========
 
 if(BUILD_DOCS AND DOXYGEN_FOUND)
   # not documented modules list
-  list(APPEND blacklist "ts" "java" "python2" "python3" "world")
+  list(APPEND blacklist "ts" "java" "python2" "python3" "js" "world")
+  unset(CMAKE_DOXYGEN_TUTORIAL_CONTRIB_ROOT)
+  unset(CMAKE_DOXYGEN_TUTORIAL_JS_ROOT)
+
+  set(OPENCV_MATHJAX_RELPATH "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0" CACHE STRING "URI to a MathJax installation")
 
   # gathering headers
   set(paths_include)
@@ -46,6 +45,7 @@ if(BUILD_DOCS AND DOXYGEN_FOUND)
   set(paths_bib)
   set(paths_sample)
   set(paths_tutorial)
+  set(paths_hal_interface)
   set(refs_main)
   set(refs_extra)
   set(deps)
@@ -75,7 +75,28 @@ if(BUILD_DOCS AND DOXYGEN_FOUND)
       if(EXISTS "${tutorial_dir}")
         list(APPEND paths_tutorial "${tutorial_dir}")
         list(APPEND deps ${tutorial_dir})
+
+        # tutorial reference entry
+        file(GLOB tutorials RELATIVE "${OPENCV_MODULE_opencv_${m}_LOCATION}" "${tutorial_dir}/*.markdown")
+        foreach (t ${tutorials})
+          if (NOT DEFINED CMAKE_DOXYGEN_TUTORIAL_CONTRIB_ROOT)
+            set(CMAKE_DOXYGEN_TUTORIAL_CONTRIB_ROOT "- @ref tutorial_contrib_root")
+            set(tutorial_contrib_root "${CMAKE_CURRENT_BINARY_DIR}/contrib_tutorials.markdown")
+            file(WRITE "${tutorial_contrib_root}"
+              "Tutorials for contrib modules {#tutorial_contrib_root}\n"
+              "=============================\n")
+          endif()
+          file(STRINGS "${OPENCV_MODULE_opencv_${m}_LOCATION}/${t}" tutorial_id LIMIT_COUNT 1 REGEX ".*{#[^}]+}")
+          string(REGEX REPLACE ".*{#([^}]+)}" "\\1" tutorial_id "${tutorial_id}")
+          file(APPEND "${tutorial_contrib_root}" "- ${m}. @subpage ${tutorial_id}\n")
+        endforeach()
       endif()
+      # HAL replacement file
+      set(replacement_header "${OPENCV_MODULE_opencv_${m}_LOCATION}/src/hal_replacement.hpp")
+      if(EXISTS "${replacement_header}")
+        list(APPEND paths_hal_interface "${replacement_header}")
+      endif()
+
       # BiBTeX file
       set(bib_file "${docs_dir}/${m}.bib")
       if(EXISTS "${bib_file}")
@@ -116,12 +137,13 @@ if(BUILD_DOCS AND DOXYGEN_FOUND)
   set(faqfile "${CMAKE_CURRENT_SOURCE_DIR}/faq.markdown")
   set(tutorial_path "${CMAKE_CURRENT_SOURCE_DIR}/tutorials")
   set(tutorial_py_path "${CMAKE_CURRENT_SOURCE_DIR}/py_tutorials")
-  set(user_guide_path "${CMAKE_CURRENT_SOURCE_DIR}/user_guide")
+  set(CMAKE_DOXYGEN_TUTORIAL_JS_ROOT "- @ref tutorial_js_root")
+  set(tutorial_js_path "${CMAKE_CURRENT_SOURCE_DIR}/js_tutorials")
   set(example_path "${CMAKE_SOURCE_DIR}/samples")
 
   # set export variables
-  string(REPLACE ";" " \\\n" CMAKE_DOXYGEN_INPUT_LIST "${rootfile} ; ${faqfile} ; ${paths_include} ; ${paths_doc} ; ${tutorial_path} ; ${tutorial_py_path} ; ${user_guide_path} ; ${paths_tutorial}")
-  string(REPLACE ";" " \\\n" CMAKE_DOXYGEN_IMAGE_PATH "${paths_doc} ; ${tutorial_path} ; ${tutorial_py_path} ; ${user_guide_path} ; ${paths_tutorial}")
+  string(REPLACE ";" " \\\n" CMAKE_DOXYGEN_INPUT_LIST "${rootfile} ; ${faqfile} ; ${paths_include} ; ${paths_hal_interface} ; ${paths_doc} ; ${tutorial_path} ; ${tutorial_py_path} ; ${tutorial_js_path} ; ${paths_tutorial} ; ${tutorial_contrib_root}")
+  string(REPLACE ";" " \\\n" CMAKE_DOXYGEN_IMAGE_PATH "${paths_doc} ; ${tutorial_path} ; ${tutorial_py_path} ; ${tutorial_js_path} ; ${paths_tutorial}")
   # TODO: remove paths_doc from EXAMPLE_PATH after face module tutorials/samples moved to separate folders
   string(REPLACE ";" " \\\n" CMAKE_DOXYGEN_EXAMPLE_PATH  "${example_path} ; ${paths_doc} ; ${paths_sample}")
   set(CMAKE_DOXYGEN_LAYOUT "${CMAKE_CURRENT_SOURCE_DIR}/DoxygenLayout.xml")
@@ -142,32 +164,59 @@ if(BUILD_DOCS AND DOXYGEN_FOUND)
   list(APPEND CMAKE_DOXYGEN_HTML_FILES "${CMAKE_CURRENT_SOURCE_DIR}/mymath.sty")
   string(REPLACE ";" " \\\n" CMAKE_DOXYGEN_HTML_FILES "${CMAKE_DOXYGEN_HTML_FILES}")
 
-  if(PLANTUML_JAR)
-    set(CMAKE_DOXYGEN_PLANTUML_SUPPORT "PLANTUML_JAR_PATH      = ${PLANTUML_JAR}\n")
-  else()
-    set(CMAKE_DOXYGEN_PLANTUML_SUPPORT "ALIASES               += startuml{1}=\"@warning __No plantuml!__ \\n \\n @if DUMMY_PLANTUML_CODE\" enduml=\"@endif\"\n")
-  endif()
-
   # writing file
   configure_file(Doxyfile.in ${doxyfile} @ONLY)
   configure_file(root.markdown.in ${rootfile} @ONLY)
 
+  # js tutorial assets
+  set(opencv_tutorial_html_dir "${CMAKE_CURRENT_BINARY_DIR}/doxygen/html")
+  set(js_tutorials_assets_dir "${CMAKE_CURRENT_SOURCE_DIR}/js_tutorials/js_assets")
+  set(js_tutorials_assets_deps "")
+
+  # make sure the build directory exists
+  file(MAKE_DIRECTORY "${opencv_tutorial_html_dir}")
+
+  # gather and copy specific files for js tutorials
+  file(GLOB_RECURSE js_assets "${js_tutorials_assets_dir}/*")
+  ocv_list_filterout(js_assets "\\\\.eslintrc.json")
+  list(APPEND js_assets "${OpenCV_SOURCE_DIR}/samples/cpp/tutorial_code/calib3d/real_time_pose_estimation/Data/box.mp4")
+
+  if(BUILD_opencv_js)
+    set(ocv_js_dir "${CMAKE_BINARY_DIR}/bin")
+    set(ocv_js "opencv.js")
+    list(APPEND js_assets "${ocv_js_dir}/${ocv_js}")
+  elseif(DEFINED OPENCV_JS_LOCATION)
+    list(APPEND js_assets "${OPENCV_JS_LOCATION}")
+  endif()
+
+  # copy haar cascade files
+  set(haar_cascade_files "")
+  set(data_harrcascades_path "${OpenCV_SOURCE_DIR}/data/haarcascades/")
+  list(APPEND js_tutorials_assets_deps "${data_harrcascades_path}/haarcascade_frontalface_default.xml" "${data_harrcascades_path}/haarcascade_eye.xml")
+  list(APPEND js_assets "${data_harrcascades_path}/haarcascade_frontalface_default.xml" "${data_harrcascades_path}/haarcascade_eye.xml")
+
+  foreach(f ${js_assets})
+    get_filename_component(fname "${f}" NAME)
+    add_custom_command(OUTPUT "${opencv_tutorial_html_dir}/${fname}"
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different "${f}" "${opencv_tutorial_html_dir}/${fname}"
+                       DEPENDS "${f}"
+                       COMMENT "Copying ${fname}"
+    )
+    list(APPEND js_tutorials_assets_deps "${f}" "${opencv_tutorial_html_dir}/${fname}")
+  endforeach()
+
   add_custom_target(doxygen
     COMMAND ${DOXYGEN_EXECUTABLE} ${doxyfile}
-    DEPENDS ${doxyfile} ${rootfile} ${bibfile} ${deps}
+    DEPENDS ${doxyfile} ${rootfile} ${bibfile} ${deps} ${js_tutorials_assets_deps}
+  )
+  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doxygen/html
+    DESTINATION "${OPENCV_DOC_INSTALL_PATH}"
+    COMPONENT "docs" OPTIONAL
+  )
+
+  # Alias to build/install docs only
+  add_custom_target(install_docs
+      DEPENDS doxygen
+      COMMAND "${CMAKE_COMMAND}" -DCMAKE_INSTALL_COMPONENT=docs -P "${CMAKE_BINARY_DIR}/cmake_install.cmake"
   )
 endif()
-
-if(HAVE_DOC_GENERATOR)
-  # installation
-  foreach(f ${DOC_LIST})
-    install(FILES "${f}" DESTINATION "${OPENCV_DOC_INSTALL_PATH}" COMPONENT docs)
-  endforeach()
-  foreach(f ${OPTIONAL_DOC_LIST})
-    install(FILES "${f}" DESTINATION "${OPENCV_DOC_INSTALL_PATH}" OPTIONAL COMPONENT docs)
-  endforeach()
-
-  # dummy targets
-  add_custom_target(docs)
-  add_custom_target(html_docs)
-endif(HAVE_DOC_GENERATOR)

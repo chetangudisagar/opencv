@@ -49,7 +49,9 @@
 
 using namespace std;
 using namespace cv;
+#ifdef HAVE_OPENCV_FLANN
 using namespace cv::flann;
+#endif
 
 //--------------------------------------------------------------------------------
 class NearestNeighborTest : public cvtest::BaseTest
@@ -67,13 +69,13 @@ protected:
     virtual void run( int start_from );
     virtual void createModel( const Mat& data ) = 0;
     virtual int findNeighbors( Mat& points, Mat& neighbors ) = 0;
-    virtual int checkGetPoins( const Mat& data );
+    virtual int checkGetPoints( const Mat& data );
     virtual int checkFindBoxed();
     virtual int checkFind( const Mat& data );
     virtual void releaseModel() = 0;
 };
 
-int NearestNeighborTest::checkGetPoins( const Mat& )
+int NearestNeighborTest::checkGetPoints( const Mat& )
 {
    return cvtest::TS::OK;
 }
@@ -127,11 +129,11 @@ int NearestNeighborTest::checkFind( const Mat& data )
 void NearestNeighborTest::run( int /*start_from*/ ) {
     int code = cvtest::TS::OK, tempCode;
     Mat desc( featuresCount, dims, CV_32FC1 );
-    randu( desc, Scalar(minValue), Scalar(maxValue) );
+    ts->get_rng().fill( desc, RNG::UNIFORM, minValue, maxValue );
 
     createModel( desc );
 
-    tempCode = checkGetPoins( desc );
+    tempCode = checkGetPoints( desc );
     if( tempCode != cvtest::TS::OK )
     {
         ts->printf( cvtest::TS::LOG, "bad accuracy of GetPoints \n" );
@@ -158,10 +160,12 @@ void NearestNeighborTest::run( int /*start_from*/ ) {
 }
 
 //--------------------------------------------------------------------------------
+#ifdef HAVE_OPENCV_FLANN
+
 class CV_FlannTest : public NearestNeighborTest
 {
 public:
-    CV_FlannTest() {}
+    CV_FlannTest() : NearestNeighborTest(), index(NULL) { }
 protected:
     void createIndex( const Mat& data, const IndexParams& params );
     int knnSearch( Mat& points, Mat& neighbors );
@@ -172,6 +176,9 @@ protected:
 
 void CV_FlannTest::createIndex( const Mat& data, const IndexParams& params )
 {
+    // release previously allocated index
+    releaseModel();
+
     index = new Index( data, params );
 }
 
@@ -238,7 +245,11 @@ int CV_FlannTest::radiusSearch( Mat& points, Mat& neighbors )
 
 void CV_FlannTest::releaseModel()
 {
-    delete index;
+    if (index)
+    {
+        delete index;
+        index = NULL;
+    }
 }
 
 //---------------------------------------
@@ -324,3 +335,5 @@ TEST(Features2d_FLANN_KDTree, regression) { CV_FlannKDTreeIndexTest test; test.s
 TEST(Features2d_FLANN_Composite, regression) { CV_FlannCompositeIndexTest test; test.safe_run(); }
 TEST(Features2d_FLANN_Auto, regression) { CV_FlannAutotunedIndexTest test; test.safe_run(); }
 TEST(Features2d_FLANN_Saved, regression) { CV_FlannSavedIndexTest test; test.safe_run(); }
+
+#endif

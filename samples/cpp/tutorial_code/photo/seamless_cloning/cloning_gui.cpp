@@ -452,7 +452,7 @@ int main()
 
     for(;;)
     {
-        char key = (char) waitKey(0);
+        char key = (char)waitKey(0);
 
         if(key == 'd' && flag3 == 0)
         {
@@ -542,5 +542,4 @@ int main()
         else if(key == 'q')
             exit(0);
     }
-    waitKey(0);
 }

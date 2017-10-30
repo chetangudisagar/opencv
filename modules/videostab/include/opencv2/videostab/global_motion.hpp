@@ -40,8 +40,8 @@
 //
 //M*/
 
-#ifndef __OPENCV_VIDEOSTAB_GLOBAL_MOTION_HPP__
-#define __OPENCV_VIDEOSTAB_GLOBAL_MOTION_HPP__
+#ifndef OPENCV_VIDEOSTAB_GLOBAL_MOTION_HPP
+#define OPENCV_VIDEOSTAB_GLOBAL_MOTION_HPP
 
 #include <vector>
 #include <fstream>
@@ -236,6 +236,7 @@ public:
     Ptr<IOutlierRejector> outlierRejector() const { return outlierRejector_; }
 
     virtual Mat estimate(const Mat &frame0, const Mat &frame1, bool *ok = 0);
+    Mat estimate(InputArray frame0, InputArray frame1, bool *ok = 0);
 
 private:
     Ptr<MotionEstimatorBase> motionEstimator_;
@@ -249,7 +250,7 @@ private:
     std::vector<Point2f> pointsPrevGood_, pointsGood_;
 };
 
-#if defined(HAVE_OPENCV_CUDAIMGPROC) && defined(HAVE_OPENCV_CUDA) && defined(HAVE_OPENCV_CUDAOPTFLOW)
+#if defined(HAVE_OPENCV_CUDAIMGPROC) && defined(HAVE_OPENCV_CUDAOPTFLOW)
 
 class CV_EXPORTS KeypointBasedMotionEstimatorGpu : public ImageMotionEstimatorBase
 {
@@ -280,7 +281,7 @@ private:
     std::vector<uchar> rejectionStatus_;
 };
 
-#endif // defined(HAVE_OPENCV_CUDAIMGPROC) && defined(HAVE_OPENCV_CUDA) && defined(HAVE_OPENCV_CUDAOPTFLOW)
+#endif // defined(HAVE_OPENCV_CUDAIMGPROC) && defined(HAVE_OPENCV_CUDAOPTFLOW)
 
 /** @brief Computes motion between two frames assuming that all the intermediate motions are known.
 
