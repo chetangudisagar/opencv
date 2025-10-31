@@ -3,7 +3,7 @@
 @brief Sample code that shows how to implement your own linear filters by using filter2D function
 """
 import sys
-import cv2
+import cv2 as cv
 import numpy as np
 
 
@@ -11,15 +11,15 @@ def main(argv):
     window_name = 'filter2D Demo'
 
     ## [load]
-    imageName = argv[0] if len(argv) > 0 else "../data/lena.jpg"
+    imageName = argv[0] if len(argv) > 0 else 'lena.jpg'
 
     # Loads an image
-    src = cv2.imread(imageName, cv2.IMREAD_COLOR)
+    src = cv.imread(cv.samples.findFile(imageName), cv.IMREAD_COLOR)
 
     # Check if image is loaded fine
     if src is None:
         print ('Error opening image!')
-        print ('Usage: filter2D.py [image_name -- default ../data/lena.jpg] \n')
+        print ('Usage: filter2D.py [image_name -- default lena.jpg] \n')
         return -1
     ## [load]
     ## [init_arguments]
@@ -37,11 +37,11 @@ def main(argv):
         ## [update_kernel]
         ## [apply_filter]
         # Apply filter
-        dst = cv2.filter2D(src, ddepth, kernel)
+        dst = cv.filter2D(src, ddepth, kernel)
         ## [apply_filter]
-        cv2.imshow(window_name, dst)
+        cv.imshow(window_name, dst)
 
-        c = cv2.waitKey(500)
+        c = cv.waitKey(500)
         if c == 27:
             break
 

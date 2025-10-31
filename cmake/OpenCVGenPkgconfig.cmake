@@ -1,4 +1,4 @@
-if(MSVC OR IOS)
+if(MSVC OR IOS OR XROS)
   return()
 endif()
 
@@ -43,9 +43,9 @@ endmacro()
 if(NOT DEFINED CMAKE_HELPER_SCRIPT)
 
 if(INSTALL_TO_MANGLED_PATHS)
-  set(OPENCV_PC_FILE_NAME "opencv-${OPENCV_VERSION}.pc")
+  ocv_update(OPENCV_PC_FILE_NAME "opencv-${OPENCV_VERSION}.pc")
 else()
-  set(OPENCV_PC_FILE_NAME opencv.pc)
+  ocv_update(OPENCV_PC_FILE_NAME opencv4.pc)
 endif()
 
 # build the list of opencv libs and dependencies for all modules
@@ -103,14 +103,14 @@ add_custom_target(gen-pkgconfig ALL SOURCES "${CMAKE_BINARY_DIR}/unix-install/${
 add_dependencies(developer_scripts gen-pkgconfig)
 
 
-if(UNIX AND NOT ANDROID)
+if((UNIX AND NOT ANDROID) OR MINGW)
   install(FILES ${CMAKE_BINARY_DIR}/unix-install/${OPENCV_PC_FILE_NAME} DESTINATION ${OPENCV_LIB_INSTALL_PATH}/pkgconfig COMPONENT dev)
 endif()
 
 # =============================================================================
 else() # DEFINED CMAKE_HELPER_SCRIPT
 
-cmake_minimum_required(VERSION 2.8.12.2)
+cmake_minimum_required(VERSION 3.5)
 cmake_policy(SET CMP0012 NEW)
 include("${CMAKE_HELPER_SCRIPT}")
 include("${OpenCV_SOURCE_DIR}/cmake/OpenCVUtils.cmake")

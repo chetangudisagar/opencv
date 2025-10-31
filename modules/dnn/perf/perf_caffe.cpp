@@ -34,12 +34,11 @@
 #include <iostream>
 #include <caffe/caffe.hpp>
 
-namespace cvtest
-{
+namespace opencv_test {
 
 static caffe::Net<float>* initNet(std::string proto, std::string weights)
 {
-    proto = findDataFile(proto, false);
+    proto = findDataFile(proto);
     weights = findDataFile(weights, false);
 
 #ifdef HAVE_CLCAFFE
@@ -68,18 +67,18 @@ static caffe::Net<float>* initNet(std::string proto, std::string weights)
     return net;
 }
 
-PERF_TEST(GoogLeNet_caffe, CaffePerfTest)
-{
-    caffe::Net<float>* net = initNet("dnn/bvlc_googlenet.prototxt",
-                                     "dnn/bvlc_googlenet.caffemodel");
-    TEST_CYCLE() net->Forward();
-    SANITY_CHECK_NOTHING();
-}
-
 PERF_TEST(AlexNet_caffe, CaffePerfTest)
 {
     caffe::Net<float>* net = initNet("dnn/bvlc_alexnet.prototxt",
                                      "dnn/bvlc_alexnet.caffemodel");
+    TEST_CYCLE() net->Forward();
+    SANITY_CHECK_NOTHING();
+}
+
+PERF_TEST(GoogLeNet_caffe, CaffePerfTest)
+{
+    caffe::Net<float>* net = initNet("dnn/bvlc_googlenet.prototxt",
+                                     "dnn/bvlc_googlenet.caffemodel");
     TEST_CYCLE() net->Forward();
     SANITY_CHECK_NOTHING();
 }
@@ -100,6 +99,13 @@ PERF_TEST(SqueezeNet_v1_1_caffe, CaffePerfTest)
     SANITY_CHECK_NOTHING();
 }
 
-}  // namespace cvtest
+PERF_TEST(MobileNet_SSD, CaffePerfTest)
+{
+    caffe::Net<float>* net = initNet("dnn/MobileNetSSD_deploy_19e3ec3.prototxt",
+                                     "dnn/MobileNetSSD_deploy_19e3ec3.caffemodel");
+    TEST_CYCLE() net->Forward();
+    SANITY_CHECK_NOTHING();
+}
 
+} // namespace
 #endif  // HAVE_CAFFE

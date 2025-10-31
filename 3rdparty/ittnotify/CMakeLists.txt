@@ -15,6 +15,8 @@ if(NOT WIN32)
   endif()
 endif()
 
+ocv_warnings_disable(CMAKE_C_FLAGS -Wimplicit-fallthrough)
+
 ocv_include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 set(ITT_INCLUDE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
@@ -22,7 +24,6 @@ set(ITT_PUBLIC_HDRS
     include/ittnotify.h
     include/jitprofiling.h
     include/libittnotify.h
-    include/llvm_jit_event_listener.hpp
 )
 set(ITT_PRIVATE_HDRS
     src/ittnotify/disable_warnings.h
@@ -35,17 +36,16 @@ set(ITT_SRCS
     src/ittnotify/jitprofiling.c
 )
 
-add_library(${ITT_LIBRARY} STATIC ${ITT_SRCS} ${ITT_PUBLIC_HDRS} ${ITT_PRIVATE_HDRS})
+add_library(${ITT_LIBRARY} STATIC ${OPENCV_3RDPARTY_EXCLUDE_FROM_ALL} ${ITT_SRCS} ${ITT_PUBLIC_HDRS} ${ITT_PRIVATE_HDRS})
+
+file(STRINGS "src/ittnotify/ittnotify_config.h" API_VERSION_NUM REGEX "#define\[ \t]+API_VERSION_NUM[ \t]+([0-9\.]+)")
+if(API_VERSION_NUM MATCHES "#define\[ \t]+API_VERSION_NUM[ \t]+([0-9\.]*)")
+  set(ITTNOTIFY_VERSION "${CMAKE_MATCH_1}"  CACHE INTERNAL "" FORCE)
+endif()
 
 if(NOT WIN32)
   if(HAVE_DL_LIBRARY)
     target_link_libraries(${ITT_LIBRARY} dl)
-  endif()
-endif()
-
-if(UNIX)
-  if(CMAKE_COMPILER_IS_GNUCXX OR CV_ICC)
-     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
   endif()
 endif()
 
@@ -58,11 +58,14 @@ set_target_properties(${ITT_LIBRARY} PROPERTIES
     )
 
 ocv_warnings_disable(CMAKE_C_FLAGS -Wundef -Wsign-compare)
+ocv_warnings_disable(CMAKE_C_FLAGS -Wstrict-prototypes) # clang15
 
 if(ENABLE_SOLUTION_FOLDERS)
   set_target_properties(${ITT_LIBRARY} PROPERTIES FOLDER "3rdparty")
 endif()
 
 if(NOT BUILD_SHARED_LIBS)
-  ocv_install_target(${ITT_LIBRARY} EXPORT OpenCVModules ARCHIVE DESTINATION ${OPENCV_3P_LIB_INSTALL_PATH} COMPONENT dev)
+  ocv_install_target(${ITT_LIBRARY} EXPORT OpenCVModules ARCHIVE DESTINATION ${OPENCV_3P_LIB_INSTALL_PATH} COMPONENT dev OPTIONAL)
 endif()
+
+ocv_install_3rdparty_licenses(ittnotify src/ittnotify/BSD-3-Clause.txt src/ittnotify/GPL-2.0-only.txt)

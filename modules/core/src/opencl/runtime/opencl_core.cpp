@@ -44,9 +44,11 @@
 #if defined(HAVE_OPENCL)
 
 #include "opencv2/core.hpp" // CV_Error
+#include "opencv2/core/utils/configuration.private.hpp"
 
 #if defined(HAVE_OPENCL_STATIC)
 #if defined __APPLE__
+#define CL_SILENCE_DEPRECATION
 #include <OpenCL/cl.h>
 #else
 #include <CL/cl.h>
@@ -63,6 +65,16 @@ CV_SUPPRESS_DEPRECATED_END
 #define ERROR_MSG_CANT_LOAD "Failed to load OpenCL runtime\n"
 #define ERROR_MSG_INVALID_VERSION "Failed to load OpenCL runtime (expected version 1.1+)\n"
 
+static std::string getRuntimePath(const std::string & defaultPath)
+{
+    const std::string res = cv::utils::getConfigurationParameterString(
+        "OPENCV_OPENCL_RUNTIME", defaultPath);
+    if (res == "disabled")
+        return std::string();
+    else
+        return res;
+}
+
 #if defined(__APPLE__)
 #include <dlfcn.h>
 
@@ -75,14 +87,13 @@ static void* AppleCLGetProcAddress(const char* name)
         cv::AutoLock lock(cv::getInitializationMutex());
         if (!initialized)
         {
-            const char* path = "/System/Library/Frameworks/OpenCL.framework/Versions/Current/OpenCL";
-            const char* envPath = getenv("OPENCV_OPENCL_RUNTIME");
-            if (envPath)
-                path = envPath;
-            handle = dlopen(oclpath, RTLD_LAZY | RTLD_GLOBAL);
+            const char* defaultPath = "/System/Library/Frameworks/OpenCL.framework/Versions/Current/OpenCL";
+            std::string path = getRuntimePath(defaultPath);
+            if (!path.empty())
+                handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
             if (handle == NULL)
             {
-                if (envPath)
+                if (path != NULL && path != defaultPath)
                     fprintf(stderr, ERROR_MSG_CANT_LOAD);
             }
             else if (dlsym(handle, OPENCL_FUNC_TO_CHECK_1_1) == NULL)
@@ -115,14 +126,13 @@ static void* WinGetProcAddress(const char* name)
             handle = GetModuleHandleA("OpenCL.dll");
             if (!handle)
             {
-                const char* path = "OpenCL.dll";
-                const char* envPath = getenv("OPENCV_OPENCL_RUNTIME");
-                if (envPath)
-                    path = envPath;
-                handle = LoadLibraryA(path);
+                const std::string defaultPath = "OpenCL.dll";
+                const std::string path = getRuntimePath(defaultPath);
+                if (!path.empty())
+                    handle = LoadLibraryA(path.c_str());
                 if (!handle)
                 {
-                    if (envPath)
+                    if (!path.empty() && path != defaultPath)
                         fprintf(stderr, ERROR_MSG_CANT_LOAD);
                 }
                 else if (GetProcAddress(handle, OPENCL_FUNC_TO_CHECK_1_1) == NULL)
@@ -142,7 +152,7 @@ static void* WinGetProcAddress(const char* name)
 #define CV_CL_GET_PROC_ADDRESS(name) WinGetProcAddress(name)
 #endif // _WIN32
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #include <dlfcn.h>
 #include <stdio.h>
 
@@ -164,6 +174,22 @@ static void *GetHandle(const char *file)
     return handle;
 }
 
+#ifdef __ANDROID__
+
+static const char *defaultAndroidPaths[] = {
+    "libOpenCL.so",
+    "/system/lib64/libOpenCL.so",
+    "/system/vendor/lib64/libOpenCL.so",
+    "/system/vendor/lib64/egl/libGLES_mali.so",
+    "/system/vendor/lib64/libPVROCL.so",
+    "/data/data/org.pocl.libs/files/lib64/libpocl.so",
+    "/system/lib/libOpenCL.so",
+    "/system/vendor/lib/libOpenCL.so",
+    "/system/vendor/lib/egl/libGLES_mali.so",
+    "/system/vendor/lib/libPVROCL.so",
+    "/data/data/org.pocl.libs/files/lib/libpocl.so"
+};
+
 static void* GetProcAddress(const char* name)
 {
     static bool initialized = false;
@@ -173,18 +199,51 @@ static void* GetProcAddress(const char* name)
         cv::AutoLock lock(cv::getInitializationMutex());
         if (!initialized)
         {
-            const char* envPath = getenv("OPENCV_OPENCL_RUNTIME");
-            if (envPath)
+            bool foundOpenCL = false;
+            for (unsigned int i = 0; i < (sizeof(defaultAndroidPaths)/sizeof(char*)); i++)
             {
-                handle = GetHandle(envPath);
-                if (!handle)
-                    fprintf(stderr, ERROR_MSG_CANT_LOAD);
+                const std::string path = (i==0) ? getRuntimePath(defaultAndroidPaths[i]) : defaultAndroidPaths[i];
+                if (!path.empty()) {
+                    handle = GetHandle(path.c_str());
+                    if (handle) {
+                        foundOpenCL = true;
+                        break;
+                    }
+                }
             }
-            else
+            initialized = true;
+            if (!foundOpenCL)
+                fprintf(stderr, ERROR_MSG_CANT_LOAD);
+        }
+    }
+    if (!handle)
+        return NULL;
+    return dlsym(handle, name);
+}
+
+#else // NOT __ANDROID__
+
+static void* GetProcAddress(const char* name)
+{
+    static bool initialized = false;
+    static void* handle = NULL;
+    if (!handle && !initialized)
+    {
+        cv::AutoLock lock(cv::getInitializationMutex());
+        if (!initialized)
+        {
+            const char* defaultPath = "libOpenCL.so";
+            const std::string path = getRuntimePath(defaultPath);
+            if (!path.empty())
             {
-                handle = GetHandle("libOpenCL.so");
+                handle = GetHandle(path.c_str());
                 if (!handle)
-                    handle = GetHandle("libOpenCL.so.1");
+                {
+                    if (path == defaultPath)
+                        handle = GetHandle("libOpenCL.so.1");
+                    else
+                        fprintf(stderr, ERROR_MSG_CANT_LOAD);
+                }
             }
             initialized = true;
         }
@@ -193,6 +252,8 @@ static void* GetProcAddress(const char* name)
         return NULL;
     return dlsym(handle, name);
 }
+#endif // __ANDROID__
+
 #define CV_CL_GET_PROC_ADDRESS(name) GetProcAddress(name)
 #endif
 
@@ -304,7 +365,7 @@ static void* opencl_check_fn(int ID)
 #endif
     else
     {
-        CV_ErrorNoReturn(cv::Error::StsBadArg, "Invalid function ID");
+        CV_Error(cv::Error::StsBadArg, "Invalid function ID");
     }
     void* func = CV_CL_GET_PROC_ADDRESS(e->fnName);
     if (!func)
@@ -334,7 +395,7 @@ CV_SUPPRESS_DEPRECATED_END
 #include "opencv2/core/opencl/runtime/opencl_gl.hpp"
 #endif
 
-#else HAVE_OPENCL_STATIC
+#else // HAVE_OPENCL_STATIC
 
 #include "opencv2/core/opencl/runtime/opencl_gl.hpp"
 
@@ -347,7 +408,7 @@ static void* opencl_gl_check_fn(int ID);
 static void* opencl_gl_check_fn(int ID)
 {
     const struct DynamicFnEntry* e = NULL;
-    assert(ID >= 0 && ID < (int)(sizeof(opencl_gl_fn_list)/sizeof(opencl_gl_fn_list[0])));
+    CV_Assert(ID >= 0 && ID < (int)(sizeof(opencl_gl_fn_list)/sizeof(opencl_gl_fn_list[0])));
     e = opencl_gl_fn_list[ID];
     void* func = CV_CL_GET_PROC_ADDRESS(e->fnName);
     if (!func)

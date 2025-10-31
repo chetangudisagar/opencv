@@ -1,7 +1,15 @@
 Smoothing Images {#tutorial_gausian_median_blur_bilateral_filter}
 ================
 
+@tableofcontents
+
+@prev_tutorial{tutorial_random_generator_and_text}
 @next_tutorial{tutorial_erosion_dilatation}
+
+|    |    |
+| -: | :- |
+| Original author | Ana Huamán |
+| Compatibility | OpenCV >= 3.0 |
 
 Goal
 ----
@@ -66,7 +74,7 @@ Applications](http://szeliski.org/Book/) by Richard Szeliski and to *LearningOpe
     @note
     Remember that a 2D Gaussian can be represented as :
     \f[G_{0}(x, y) = A  e^{ \dfrac{ -(x - \mu_{x})^{2} }{ 2\sigma^{2}_{x} } +  \dfrac{ -(y - \mu_{y})^{2} }{ 2\sigma^{2}_{y} } }\f]
-    where \f$\mu\f$ is the mean (the peak) and \f$\sigma\f$ represents the variance (per each of the
+    where \f$\mu\f$ is the mean (the peak) and \f$\sigma^{2}\f$ represents the variance (per each of the
     variables \f$x\f$ and \f$y\f$)
 
 ### Median Filter
@@ -97,7 +105,7 @@ Code
 
 @add_toggle_cpp
 -   **Downloadable code**: Click
-    [here](https://raw.githubusercontent.com/opencv/opencv/master/samples/cpp/tutorial_code/ImgProc/Smoothing/Smoothing.cpp)
+    [here](https://raw.githubusercontent.com/opencv/opencv/4.x/samples/cpp/tutorial_code/ImgProc/Smoothing/Smoothing.cpp)
 
 -   **Code at glance:**
     @include samples/cpp/tutorial_code/ImgProc/Smoothing/Smoothing.cpp
@@ -105,7 +113,7 @@ Code
 
 @add_toggle_java
 -   **Downloadable code**: Click
-    [here](https://raw.githubusercontent.com/opencv/opencv/master/samples/java/tutorial_code/ImgProc/Smoothing/Smoothing.java)
+    [here](https://raw.githubusercontent.com/opencv/opencv/4.x/samples/java/tutorial_code/ImgProc/Smoothing/Smoothing.java)
 
 -   **Code at glance:**
     @include samples/java/tutorial_code/ImgProc/Smoothing/Smoothing.java
@@ -113,7 +121,7 @@ Code
 
 @add_toggle_python
 -   **Downloadable code**: Click
-    [here](https://raw.githubusercontent.com/opencv/opencv/master/samples/python/tutorial_code/imgProc/Smoothing/smoothing.py)
+    [here](https://raw.githubusercontent.com/opencv/opencv/4.x/samples/python/tutorial_code/imgProc/Smoothing/smoothing.py)
 
 -   **Code at glance:**
     @include samples/python/tutorial_code/imgProc/Smoothing/smoothing.py
@@ -125,7 +133,7 @@ Explanation
 Let's check the OpenCV functions that involve only the smoothing procedure, since the rest is
 already known by now.
 
-#### Normalized Block Filter:
+### Normalized Block Filter:
 
 -   OpenCV offers the function **blur()** to perform smoothing with this filter.
     We specify 4 arguments (more details, check the Reference):
@@ -149,14 +157,14 @@ already known by now.
 @snippet samples/python/tutorial_code/imgProc/Smoothing/smoothing.py blur
 @end_toggle
 
-#### Gaussian Filter:
+### Gaussian Filter:
 
 -   It is performed by the function **GaussianBlur()** :
     Here we use 4 arguments (more details, check the OpenCV reference):
     -   *src*: Source image
     -   *dst*: Destination image
     -   *Size(w, h)*: The size of the kernel to be used (the neighbors to be considered). \f$w\f$ and
-        \f$h\f$ have to be odd and positive numbers otherwise thi size will be calculated using the
+        \f$h\f$ have to be odd and positive numbers otherwise the size will be calculated using the
         \f$\sigma_{x}\f$ and \f$\sigma_{y}\f$ arguments.
     -   \f$\sigma_{x}\f$: The standard deviation in x. Writing \f$0\f$ implies that \f$\sigma_{x}\f$ is
         calculated using kernel size.
@@ -175,7 +183,7 @@ already known by now.
 @snippet samples/python/tutorial_code/imgProc/Smoothing/smoothing.py gaussianblur
 @end_toggle
 
-#### Median Filter:
+### Median Filter:
 
 -   This filter is provided by the **medianBlur()** function:
     We use three arguments:
@@ -195,7 +203,7 @@ already known by now.
 @snippet samples/python/tutorial_code/imgProc/Smoothing/smoothing.py medianblur
 @end_toggle
 
-#### Bilateral Filter
+### Bilateral Filter
 
 -   Provided by OpenCV function **bilateralFilter()**
     We use 5 arguments:
@@ -220,7 +228,7 @@ already known by now.
 Results
 -------
 
--   The code opens an image (in this case [lena.jpg](https://raw.githubusercontent.com/opencv/opencv/master/samples/data/lena.jpg))
+-   The code opens an image (in this case [lena.jpg](https://raw.githubusercontent.com/opencv/opencv/4.x/samples/data/lena.jpg))
     and display it under the effects of the 4 filters explained.
 -   Here is a snapshot of the image smoothed using *medianBlur*:
 

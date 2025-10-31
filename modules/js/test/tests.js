@@ -38,16 +38,33 @@
 // the use of this software, even if advised of the possibility of such damage.
 //
 
-let testrunner = require('qunit');
+let testrunner = require('node-qunit');
 testrunner.options.maxBlockDuration = 20000; // cause opencv_js.js need time to load
 
 testrunner.run(
     {
-        code: 'opencv.js',
-        tests: ['test_mat.js', 'test_utils.js', 'test_imgproc.js',
-                'test_objdetect.js', 'test_video.js'],
+        code: {path: "opencv.js", namespace: "cv"},
+        tests: ['init_cv.js',
+                'test_mat.js',
+                'test_utils.js',
+                'test_core.js',
+                'test_imgproc.js',
+                'test_objdetect.js',
+                'test_video.js',
+                'test_features2d.js',
+                'test_photo.js',
+                'test_calib3d.js',
+        ],
     },
     function(err, report) {
         console.log(report.failed + ' failed, ' + report.passed + ' passed');
+        if (report.failed || err) {
+            if (err) {
+                console.log(err);
+            }
+            process.on('exit', function() {
+                process.exit(1);
+            });
+        }
     }
 );

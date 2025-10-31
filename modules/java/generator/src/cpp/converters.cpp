@@ -1,3 +1,7 @@
+// This file is part of OpenCV project.
+// It is subject to the license terms in the LICENSE file found in the top-level directory
+// of this distribution and at http://opencv.org/license.html
+
 #define LOG_TAG "org.opencv.utils.Converters"
 #include "common.h"
 
@@ -99,6 +103,20 @@ void Mat_to_vector_Rect2d(Mat& mat, std::vector<Rect2d>& v_rect)
 }
 
 void vector_Rect2d_to_Mat(std::vector<Rect2d>& v_rect, Mat& mat)
+{
+    mat = Mat(v_rect, true);
+}
+
+//vector_RotatedRect
+
+void Mat_to_vector_RotatedRect(Mat& mat, std::vector<RotatedRect>& v_rect)
+{
+    v_rect.clear();
+    CHECK_MAT(mat.type()==CV_32FC(5) && mat.cols==1);
+    v_rect = (std::vector<RotatedRect>) mat;
+}
+
+void vector_RotatedRect_to_Mat(std::vector<RotatedRect>& v_rect, Mat& mat)
 {
     mat = Mat(v_rect, true);
 }
@@ -212,6 +230,32 @@ void vector_Mat_to_Mat(std::vector<cv::Mat>& v_mat, cv::Mat& mat)
         long long addr = (long long) new Mat(v_mat[i]);
         mat.at< Vec<int, 2> >(i, 0) = Vec<int, 2>(addr>>32, addr&0xffffffff);
     }
+}
+
+void Mat_to_vector_vector_Mat(Mat& mat, std::vector< std::vector< Mat > >& vv_mat)
+{
+    std::vector<Mat> vm;
+    vm.reserve( mat.rows );
+    Mat_to_vector_Mat(mat, vm);
+    for(size_t i=0; i<vm.size(); i++)
+    {
+        std::vector<Mat> vmat;
+        Mat_to_vector_Mat(vm[i], vmat);
+        vv_mat.push_back(vmat);
+    }
+}
+
+void vector_vector_Mat_to_Mat(std::vector< std::vector< Mat > >& vv_mat, Mat& mat)
+{
+    std::vector<Mat> vm;
+    vm.reserve( vv_mat.size() );
+    for(size_t i=0; i<vv_mat.size(); i++)
+    {
+        Mat m;
+        vector_Mat_to_Mat(vv_mat[i], m);
+        vm.push_back(m);
+    }
+    vector_Mat_to_Mat(vm, mat);
 }
 
 void Mat_to_vector_vector_Point(Mat& mat, std::vector< std::vector< Point > >& vv_pt)

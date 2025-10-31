@@ -1,3 +1,6 @@
+// This file is part of OpenCV project.
+// It is subject to the license terms in the LICENSE file found in the top-level directory
+// of this distribution and at http://opencv.org/license.html.
 #include "precomp.hpp"
 #include <sstream>
 
@@ -50,7 +53,7 @@ struct CommandLineParser::Impl
 };
 
 
-static const char* get_type_name(int type)
+static const char* get_type_name(Param type)
 {
     if( type == Param::INT )
         return "int";
@@ -69,21 +72,16 @@ static const char* get_type_name(int type)
     return "unknown";
 }
 
-// std::tolower is int->int
-static char char_tolower(char ch)
-{
-    return (char)std::tolower((int)ch);
-}
 static bool parse_bool(std::string str)
 {
-    std::transform(str.begin(), str.end(), str.begin(), char_tolower);
+    std::transform(str.begin(), str.end(), str.begin(), details::char_tolower);
     std::istringstream is(str);
     bool b;
     is >> (str.size() > 1 ? std::boolalpha : std::noboolalpha) >> b;
     return b;
 }
 
-static void from_str(const String& str, int type, void* dst)
+static void from_str(const String& str, Param type, void* dst)
 {
     std::stringstream ss(str.c_str());
     if( type == Param::INT )
@@ -104,6 +102,12 @@ static void from_str(const String& str, int type, void* dst)
         ss >> *(double*)dst;
     else if( type == Param::STRING )
         *(String*)dst = str;
+    else if( type == Param::SCALAR)
+    {
+        Scalar& scalar = *(Scalar*)dst;
+        for (int i = 0; i < 4 && !ss.eof(); ++i)
+            ss >> scalar[i];
+    }
     else
         CV_Error(Error::StsBadArg, "unknown/unsupported parameter type");
 
@@ -113,7 +117,7 @@ static void from_str(const String& str, int type, void* dst)
     }
 }
 
-void CommandLineParser::getByName(const String& name, bool space_delete, int type, void* dst) const
+void CommandLineParser::getByName(const String& name, bool space_delete, Param type, void* dst) const
 {
     try
     {
@@ -140,7 +144,7 @@ void CommandLineParser::getByName(const String& name, bool space_delete, int typ
             }
         }
     }
-    catch (Exception& e)
+    catch (const Exception& e)
     {
         impl->error = true;
         impl->error_message = impl->error_message + "Parameter '"+ name + "': " + e.err + "\n";
@@ -151,7 +155,7 @@ void CommandLineParser::getByName(const String& name, bool space_delete, int typ
 }
 
 
-void CommandLineParser::getByIndex(int index, bool space_delete, int type, void* dst) const
+void CommandLineParser::getByIndex(int index, bool space_delete, Param type, void* dst) const
 {
     try
     {
@@ -173,7 +177,7 @@ void CommandLineParser::getByIndex(int index, bool space_delete, int type, void*
             }
         }
     }
-    catch(Exception& e)
+    catch (const Exception& e)
     {
         impl->error = true;
         impl->error_message = impl->error_message + format("Parameter #%d: ", index) + e.err + "\n";
@@ -360,7 +364,6 @@ bool CommandLineParser::has(const String& name) const
     }
 
     CV_Error_(Error::StsBadArg, ("undeclared key '%s' requested", name.c_str()));
-    return false;
 }
 
 bool CommandLineParser::check() const
@@ -461,7 +464,7 @@ std::vector<String> CommandLineParser::Impl::split_range_string(const String& _s
         {
             if (begin == true)
             {
-                throw cv::Exception(CV_StsParseError,
+                throw cv::Exception(cv::Error::StsParseError,
                          String("error in split_range_string(")
                          + str
                          + String(", ")
@@ -481,7 +484,7 @@ std::vector<String> CommandLineParser::Impl::split_range_string(const String& _s
         {
             if (begin == false)
             {
-                throw cv::Exception(CV_StsParseError,
+                throw cv::Exception(cv::Error::StsParseError,
                          String("error in split_range_string(")
                          + str
                          + String(", ")
@@ -505,7 +508,7 @@ std::vector<String> CommandLineParser::Impl::split_range_string(const String& _s
 
     if (begin == true)
     {
-        throw cv::Exception(CV_StsParseError,
+        throw cv::Exception(cv::Error::StsParseError,
                  String("error in split_range_string(")
                  + str
                  + String(", ")
