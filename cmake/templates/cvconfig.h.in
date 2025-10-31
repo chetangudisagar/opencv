@@ -61,12 +61,6 @@
 /* FFMpeg video library */
 #cmakedefine HAVE_FFMPEG
 
-/* ffmpeg's libswscale */
-#cmakedefine HAVE_FFMPEG_SWSCALE
-
-/* ffmpeg in Gentoo */
-#cmakedefine HAVE_GENTOO_FFMPEG
-
 /* GStreamer multimedia framework */
 #cmakedefine HAVE_GSTREAMER
 
@@ -108,6 +102,9 @@
 
 /* NVidia Video Decoding API*/
 #cmakedefine HAVE_NVCUVID
+
+/* NVidia Video Encoding API*/
+#cmakedefine HAVE_NVCUVENC
 
 /* OpenCL Support */
 #cmakedefine HAVE_OPENCL
@@ -161,6 +158,6 @@
 /* Xine video library */
 #cmakedefine HAVE_XINE
 
-/* Define to 1 if your processor stores words with the most significant byte
+/* Define if your processor stores words with the most significant byte
    first (like Motorola and SPARC, unlike Intel and VAX). */
 #cmakedefine WORDS_BIGENDIAN

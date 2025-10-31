@@ -439,8 +439,8 @@ namespace cv
 #ifdef MAKE_PARALLEL
         /******************************************************
         ** IF some parallelizing thread methods are available, then, main loops are parallelized using these functors
-        ** ==> main idea paralellise main filters loops, then, only the most used methods are parallelized... TODO : increase the number of parallelised methods as necessary
-        ** ==> functors names = Parallel_$$$ where $$$= the name of the serial method that is parallelised
+        ** ==> main idea parallelize main filters loops, then, only the most used methods are parallelized... TODO : increase the number of parallelized methods as necessary
+        ** ==> functors names = Parallel_$$$ where $$$= the name of the serial method that is parallelized
         ** ==> functors constructors can differ from the parameters used with their related serial functions
         */
 
@@ -476,8 +476,8 @@ namespace cv
 #endif
                 for (int IDrow=r.start; IDrow!=r.end; ++IDrow)
                 {
-                    register float* outputPTR=outputFrame+(IDrowEnd-IDrow)*(nbColumns)-1;
-                    register float result=0;
+                    float* outputPTR=outputFrame+(IDrowEnd-IDrow)*(nbColumns)-1;
+                    float result=0;
                     for (unsigned int index=0; index<nbColumns; ++index)
                     {
                         result = *(outputPTR)+  filterParam_a* result;
@@ -501,9 +501,9 @@ namespace cv
             virtual void operator()( const Range& r ) const {
                 for (int IDrow=r.start; IDrow!=r.end; ++IDrow)
                 {
-                    register float* outputPTR=outputFrame+(IDrowStart+IDrow)*nbColumns;
-                    register const float* inputPTR=inputFrame+(IDrowStart+IDrow)*nbColumns;
-                    register float result=0;
+                    float* outputPTR=outputFrame+(IDrowStart+IDrow)*nbColumns;
+                    const float* inputPTR=inputFrame+(IDrowStart+IDrow)*nbColumns;
+                    float result=0;
                     for (unsigned int index=0; index<nbColumns; ++index)
                     {
                         result = *(inputPTR++) + filterParam_tau**(outputPTR)+  filterParam_a* result;
@@ -526,8 +526,8 @@ namespace cv
             virtual void operator()( const Range& r ) const {
                 for (int IDcolumn=r.start; IDcolumn!=r.end; ++IDcolumn)
                 {
-                    register float result=0;
-                    register float *outputPTR=outputFrame+IDcolumn;
+                    float result=0;
+                    float *outputPTR=outputFrame+IDcolumn;
 
                     for (unsigned int index=0; index<nbRows; ++index)
                     {
@@ -554,8 +554,8 @@ namespace cv
                 float* offset=outputFrame+nbColumns*nbRows-nbColumns;
                 for (int IDcolumn=r.start; IDcolumn!=r.end; ++IDcolumn)
                 {
-                    register float result=0;
-                    register float *outputPTR=offset+IDcolumn;
+                    float result=0;
+                    float *outputPTR=offset+IDcolumn;
 
                     for (unsigned int index=0; index<nbRows; ++index)
                     {
@@ -582,7 +582,7 @@ namespace cv
                 const float *localLuminancePTR=localLuminance+r.start;
                 const float *inputFramePTR=inputFrame+r.start;
                 float *outputFramePTR=outputFrame+r.start;
-                for (register int IDpixel=r.start ; IDpixel!=r.end ; ++IDpixel, ++inputFramePTR, ++outputFramePTR)
+                for (int IDpixel=r.start ; IDpixel!=r.end ; ++IDpixel, ++inputFramePTR, ++outputFramePTR)
                 {
                     float X0=*(localLuminancePTR++)*localLuminanceFactor+localLuminanceAddon;
                     // TODO : the following line can lead to a divide by zero ! A small offset is added, take care if the offset is too large in case of High Dynamic Range images which can use very small values...
@@ -608,9 +608,9 @@ namespace cv
 
                 for (int IDrow=r.start; IDrow!=r.end; ++IDrow)
                 {
-                    register float* outputPTR=outputFrame+(IDrowEnd-IDrow)*(nbColumns)-1;
-                    register const float* spatialConstantPTR=spatialConstantBuffer+(IDrowEnd-IDrow)*(nbColumns)-1;
-                    register float result=0;
+                    float* outputPTR=outputFrame+(IDrowEnd-IDrow)*(nbColumns)-1;
+                    const float* spatialConstantPTR=spatialConstantBuffer+(IDrowEnd-IDrow)*(nbColumns)-1;
+                    float result=0;
                     for (unsigned int index=0; index<nbColumns; ++index)
                     {
                         result = *(outputPTR)+  *(spatialConstantPTR--)* result;
@@ -633,9 +633,9 @@ namespace cv
             virtual void operator()( const Range& r ) const {
                 for (int IDcolumn=r.start; IDcolumn!=r.end; ++IDcolumn)
                 {
-                    register float result=0;
-                    register float *outputPTR=outputFrame+IDcolumn;
-                    register const float* spatialConstantPTR=spatialConstantBuffer+IDcolumn;
+                    float result=0;
+                    float *outputPTR=outputFrame+IDcolumn;
+                    const float* spatialConstantPTR=spatialConstantBuffer+IDcolumn;
                     for (unsigned int index=0; index<nbRows; ++index)
                     {
                         result = *(outputPTR) +  *(spatialConstantPTR) * result;

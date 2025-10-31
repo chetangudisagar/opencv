@@ -132,6 +132,7 @@ public:
                         writer << img;
                     }
 
+                    writer.release();
                     if (!created) created = true;
                     else remove(filename.c_str());
                 }
@@ -319,6 +320,7 @@ public:
 
             for (unsigned int i = 0; i < frameCount && next; ++i)
             {
+                SCOPED_TRACE(cv::format("frame=%d", (int)i));
                 Mat actual;
                 (*capture) >> actual;
 
@@ -395,6 +397,10 @@ TEST(Highgui_Video_parallel_writers_and_readers, accuracy)
         if (code == 1)
             std::cerr << "Couldn't delete " << *i << std::endl;
     }
+
+    // delete the readers
+    for (std::vector<VideoCapture *>::iterator i = readers.begin(), end = readers.end(); i != end; ++i)
+        delete *i;
 }
 
 #endif

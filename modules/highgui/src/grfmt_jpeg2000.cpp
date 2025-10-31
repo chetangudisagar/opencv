@@ -45,6 +45,7 @@
 #ifdef HAVE_JASPER
 
 #include "grfmt_jpeg2000.hpp"
+#include "opencv2/imgproc.hpp"
 
 #ifdef WIN32
 #define JAS_WIN_MSVC_BUILD 1
@@ -76,7 +77,8 @@ static JasperInitializer initialize_jasper;
 
 Jpeg2KDecoder::Jpeg2KDecoder()
 {
-    m_signature = '\0' + string() + '\0' + string() + '\0' + string("\x0cjP  \r\n\x87\n");
+    static const unsigned char signature_[12] = { 0, 0, 0, 0x0c, 'j', 'P', ' ', ' ', 13, 10, 0x87, 10};
+    m_signature = string((const char*)signature_, (const char*)signature_ + sizeof(signature_));
     m_stream = 0;
     m_image = 0;
 }
@@ -120,6 +122,8 @@ bool  Jpeg2KDecoder::readHeader()
         jas_image_t* image = jas_image_decode( stream, -1, 0 );
         m_image = image;
         if( image ) {
+            CV_Assert(0 == (jas_image_tlx(image)) && "not supported");
+            CV_Assert(0 == (jas_image_tly(image)) && "not supported");
             m_width = jas_image_width( image );
             m_height = jas_image_height( image );
 
@@ -129,14 +133,31 @@ bool  Jpeg2KDecoder::readHeader()
             for( int i = 0; i < numcmpts; i++ )
             {
                 int depth_i = jas_image_cmptprec( image, i );
+                CV_Assert(depth == 0 || depth == depth_i); // component data type mismatch
                 depth = MAX(depth, depth_i);
                 if( jas_image_cmpttype( image, i ) > 2 )
                     continue;
+                int sgnd = jas_image_cmptsgnd(image, i);
+                int xstart = jas_image_cmpttlx(image, i);
+                int xend = jas_image_cmptbrx(image, i);
+                int xstep = jas_image_cmpthstep(image, i);
+                int ystart = jas_image_cmpttly(image, i);
+                int yend = jas_image_cmptbry(image, i);
+                int ystep = jas_image_cmptvstep(image, i);
+                CV_Assert(sgnd == 0 && "not supported");
+                CV_Assert(xstart == 0 && "not supported");
+                CV_Assert(ystart == 0 && "not supported");
+                CV_Assert(xstep == 1 && "not supported");
+                CV_Assert(ystep == 1 && "not supported");
+                CV_Assert(xend == m_width);
+                CV_Assert(yend == m_height);
                 cntcmpts++;
             }
 
             if( cntcmpts )
             {
+                CV_Assert(depth == 8 || depth == 16);
+                CV_Assert(cntcmpts == 1 || cntcmpts == 3);
                 m_type = CV_MAKETYPE(depth <= 8 ? CV_8U : CV_16U, cntcmpts > 1 ? 3 : 1);
                 result = true;
             }
@@ -149,15 +170,36 @@ bool  Jpeg2KDecoder::readHeader()
     return result;
 }
 
+static void Jpeg2KDecoder_close(Jpeg2KDecoder* ptr)
+{
+    ptr->close();
+}
+template<> void Ptr<Jpeg2KDecoder>::delete_obj() { Jpeg2KDecoder_close(obj); }
 
 bool  Jpeg2KDecoder::readData( Mat& img )
 {
+    Ptr<Jpeg2KDecoder> close_this(this);  // auto cleanup: Jpeg2KDecoder_close
     bool result = false;
     int color = img.channels() > 1;
     uchar* data = img.data;
-    int step = (int)img.step;
+    size_t step = img.step;
     jas_stream_t* stream = (jas_stream_t*)m_stream;
     jas_image_t* image = (jas_image_t*)m_image;
+
+#ifndef WIN32
+    // At least on some Linux instances the
+    // system libjasper segfaults when
+    // converting color to grey.
+    // We do this conversion manually at the end.
+    Mat clr;
+    if (CV_MAT_CN(img.type()) < CV_MAT_CN(this->type()))
+    {
+        clr.create(img.size().height, img.size().width, this->type());
+        color = true;
+        data = clr.ptr();
+        step = (int)clr.step;
+    }
+#endif
 
     if( stream && image )
     {
@@ -171,7 +213,7 @@ bool  Jpeg2KDecoder::readData( Mat& img )
         else
         {
             convert = (jas_clrspc_fam( jas_image_clrspc( image ) ) != JAS_CLRSPC_FAM_GRAY);
-            colorspace = JAS_CLRSPC_SGRAY; // TODO GENGRAY or SGRAY?
+            colorspace = JAS_CLRSPC_SGRAY; // TODO GENGRAY or SGRAY? (GENGRAY fails on Win.)
         }
 
         // convert to the desired colorspace
@@ -188,11 +230,16 @@ bool  Jpeg2KDecoder::readData( Mat& img )
                     result = true;
                 }
                 else
-                    fprintf(stderr, "JPEG 2000 LOADER ERROR: cannot convert colorspace\n");
+                {
+                    jas_cmprof_destroy(clrprof);
+                    CV_Error(CV_StsError, "JPEG 2000 LOADER ERROR: cannot convert colorspace");
+                }
                 jas_cmprof_destroy( clrprof );
             }
             else
-                fprintf(stderr, "JPEG 2000 LOADER ERROR: unable to create colorspace\n");
+            {
+                CV_Error(CV_StsError, "JPEG 2000 LOADER ERROR: unable to create colorspace");
+            }
         }
         else
             result = true;
@@ -236,13 +283,13 @@ bool  Jpeg2KDecoder::readData( Mat& img )
                         if( !jas_image_readcmpt( image, cmptlut[i], 0, 0, xend / xstep, yend / ystep, buffer ))
                         {
                             if( img.depth() == CV_8U )
-                                result = readComponent8u( data + i, buffer, step, cmptlut[i], maxval, offset, ncmpts );
+                                result = readComponent8u( data + i, buffer, validateToInt(step), cmptlut[i], maxval, offset, ncmpts );
                             else
-                                result = readComponent16u( ((unsigned short *)data) + i, buffer, step / 2, cmptlut[i], maxval, offset, ncmpts );
+                                result = readComponent16u( ((unsigned short *)data) + i, buffer, validateToInt(step / 2), cmptlut[i], maxval, offset, ncmpts );
                             if( !result )
                             {
-                                i = ncmpts;
-                                result = false;
+                                jas_matrix_destroy( buffer );
+                                CV_Error(CV_StsError, "JPEG2000 LOADER ERROR: failed to read component");
                             }
                         }
                         jas_matrix_destroy( buffer );
@@ -251,10 +298,19 @@ bool  Jpeg2KDecoder::readData( Mat& img )
             }
         }
         else
-            fprintf(stderr, "JPEG2000 LOADER ERROR: colorspace conversion failed\n" );
+        {
+            CV_Error(CV_StsError, "JPEG2000 LOADER ERROR: colorspace conversion failed");
+        }
     }
 
-    close();
+    CV_Assert(result == true);
+
+#ifndef WIN32
+    if (!clr.empty())
+    {
+        cv::cvtColor(clr, img, COLOR_BGR2GRAY);
+    }
+#endif
 
     return result;
 }
@@ -502,7 +558,7 @@ bool  Jpeg2KEncoder::writeComponent16u( void *__img, const Mat& _img )
 
     for( int y = 0; y < h; y++ )
     {
-        uchar* data = _img.data + _img.step*y;
+        const ushort* data = _img.ptr<ushort>(y);
         for( int i = 0; i < ncmpts; i++ )
         {
             for( int x = 0; x < w; x++)

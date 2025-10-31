@@ -50,6 +50,7 @@ using namespace cv::gpu;
 #ifdef HAVE_OPENCV_NONFREE
 #include "opencv2/nonfree/nonfree.hpp"
 
+CV_ATTR_USED
 static bool makeUseOfNonfree = initModule_nonfree();
 #endif
 
@@ -212,7 +213,11 @@ void GpuMatcher::match(const ImageFeatures &features1, const ImageFeatures &feat
     descriptors1_.upload(features1.descriptors);
     descriptors2_.upload(features2.descriptors);
 
-    BFMatcher_GPU matcher(NORM_L2);
+    //TODO: NORM_L1 allows to avoid matcher crashes for ORB features, but is not absolutely correct for them.
+    //      The best choice for ORB features is NORM_HAMMING, but it is incorrect for SURF features.
+    //      More accurate fix in this place should be done in the future -- the type of the norm
+    //      should be either a parameter of this method, or a field of the class.
+    BFMatcher_GPU matcher(NORM_L1);
     MatchesSet matches;
 
     // Find 1->2 matches
@@ -538,6 +543,7 @@ void FeaturesMatcher::operator ()(const vector<ImageFeatures> &features, vector<
             if (features[i].keypoints.size() > 0 && features[j].keypoints.size() > 0 && mask_(i, j))
                 near_pairs.push_back(make_pair(i, j));
 
+    pairwise_matches.clear(); // clear history values
     pairwise_matches.resize(num_images * num_images);
     MatchPairsBody body(*this, features, pairwise_matches, near_pairs);
 

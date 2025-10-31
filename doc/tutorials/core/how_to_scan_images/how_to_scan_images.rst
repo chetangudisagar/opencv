@@ -18,7 +18,7 @@ We'll seek answers for the following questions:
 Our test case
 =============
 
-Let us consider a simple color reduction method. Using the unsigned char C and C++ type for matrix item storing a channel of pixel may have up to 256 different values. For a three channel image this can allow the formation of way too many colors (16 million to be exact). Working with so many color shades may give a heavy blow to our algorithm performance. However, sometimes it is enough to work with a lot less of them to get the same final result.
+Let us consider a simple color reduction method. By using the unsigned char C and C++ type for matrix item storing, a channel of pixel may have up to 256 different values. For a three channel image this can allow the formation of way too many colors (16 million to be exact). Working with so many color shades may give a heavy blow to our algorithm performance. However, sometimes it is enough to work with a lot less of them to get the same final result.
 
 In this cases it's common that we make a *color space reduction*. This means that we divide the color space current value with a new input value to end up with fewer colors. For instance every value between zero and nine takes the new value zero, every value between ten and nineteen the value ten and so on.
 
@@ -40,7 +40,7 @@ You can download the full source code :download:`here <../../../../samples/cpp/t
 
    how_to_scan_images imageName.jpg intValueToReduce [G]
 
-The final argument is optional. If given the image will be loaded in gray scale format, otherwise the RGB color way is used. The first thing is to calculate the lookup table.
+The final argument is optional. If given the image will be loaded in gray scale format, otherwise the BGR color way is used. The first thing is to calculate the lookup table.
 
 .. literalinclude:: ../../../../samples/cpp/tutorial_code/core/how_to_scan_images/how_to_scan_images.cpp
    :language: cpp
@@ -76,7 +76,7 @@ As you could already read in my :ref:`matTheBasicImageContainer` tutorial the si
    Row n & \tabItG{n,0} & \tabItG{n,1} & \tabItG{n,...} & \tabItG{n, m} \\
    \end{tabular}
 
-For multichannel images the columns contain as many sub columns as the number of channels. For example in case of an RGB color system:
+For multichannel images the columns contain as many sub columns as the number of channels. For example in case of an BGR color system:
 
 .. math::
 
@@ -89,7 +89,7 @@ For multichannel images the columns contain as many sub columns as the number of
    Row n & \tabIt{n,0} & \tabIt{n,1} & \tabIt{n,...} & \tabIt{n, m} \\
    \end{tabular}
 
-Note that the order of the channels is inverse: BGR instead of RGB. Because in many cases the memory is large enough to store the rows in a successive fashion the rows may follow one after another, creating a single long row. Because everything is in a single place following one after another this may help to speed up the scanning process. We can use the :basicstructures:`isContinuous() <mat-iscontinuous>` function to *ask* the matrix if this is the case. Continue on to the next section to find an example.
+Because in many cases the memory is large enough to store the rows in a successive fashion the rows may follow one after another, creating a single long row. Because everything is in a single place following one after another this may help to speed up the scanning process. We can use the :basicstructures:`isContinuous() <mat-iscontinuous>` function to *ask* the matrix if this is the case. Continue on to the next section to find an example.
 
 The efficient way
 =================
@@ -179,5 +179,5 @@ Finally, you may watch a sample run of the program on the `video posted <https:/
 .. raw:: html
 
   <div align="center">
-  <iframe title="How to scan images in OpenCV?" width="560" height="349" src="http://www.youtube.com/embed/fB3AN5fjgwc?rel=0&loop=1" frameborder="0" allowfullscreen align="middle"></iframe>
+  <iframe title="How to scan images in OpenCV?" width="560" height="349" src="https://www.youtube.com/embed/fB3AN5fjgwc?rel=0&loop=1" frameborder="0" allowfullscreen align="middle"></iframe>
   </div>

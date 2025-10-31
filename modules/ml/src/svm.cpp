@@ -1632,7 +1632,7 @@ bool CvSVM::train( const CvMat* _train_data, const CvMat* _responses,
     if( !do_train( svm_type, sample_count, var_count, samples, responses, temp_storage, alpha ))
         EXIT;
 
-    ok = true; // model has been trained succesfully
+    ok = true; // model has been trained successfully
 
     __END__;
 
@@ -1880,7 +1880,7 @@ bool CvSVM::train_auto( const CvMat* _train_data, const CvMat* _responses,
         qsort(ratios, k_fold, sizeof(ratios[0]), icvCmpIndexedratio);
         double old_dist = 0.0;
         for (int k=0; k<k_fold; ++k)
-            old_dist += abs(ratios[k].val-class_ratio);
+            old_dist += std::abs(ratios[k].val-class_ratio);
         double new_dist = 1.0;
         // iterate to make the folds more balanced
         while (new_dist > 0.0)
@@ -1897,7 +1897,7 @@ bool CvSVM::train_auto( const CvMat* _train_data, const CvMat* _responses,
             qsort(ratios, k_fold, sizeof(ratios[0]), icvCmpIndexedratio);
             new_dist = 0.0;
             for (int k=0; k<k_fold; ++k)
-                new_dist += abs(ratios[k].val-class_ratio);
+                new_dist += std::abs(ratios[k].val-class_ratio);
             if (new_dist < old_dist)
             {
                 // swapping really improves, so swap the samples
@@ -2298,14 +2298,29 @@ void CvSVM::write_params( CvFileStorage* fs ) const
 }
 
 
+static bool isSvmModelApplicable(int sv_total, int var_all, int var_count, int class_count)
+{
+    return (sv_total > 0 && var_count > 0 && var_count <= var_all && class_count >= 0);
+}
+
+
 void CvSVM::write( CvFileStorage* fs, const char* name ) const
 {
     CV_FUNCNAME( "CvSVM::write" );
 
     __BEGIN__;
 
-    int i, var_count = get_var_count(), df_count, class_count;
+    int i, var_count = get_var_count(), df_count;
+    int class_count = class_labels ? class_labels->cols :
+                      params.svm_type == CvSVM::ONE_CLASS ? 1 : 0;
     const CvSVMDecisionFunc* df = decision_func;
+    if( !isSvmModelApplicable(sv_total, var_all, var_count, class_count) )
+    {
+        cvReleaseFileStorage( &fs );
+        fs = NULL;
+
+        CV_ERROR( CV_StsParseError, "SVM model data is invalid, check sv_count, var_* and class_count tags" );
+    }
 
     cvStartWriteStruct( fs, name, CV_NODE_MAP, CV_TYPE_NAME_ML_SVM );
 
@@ -2313,9 +2328,6 @@ void CvSVM::write( CvFileStorage* fs, const char* name ) const
 
     cvWriteInt( fs, "var_all", var_all );
     cvWriteInt( fs, "var_count", var_count );
-
-    class_count = class_labels ? class_labels->cols :
-                  params.svm_type == CvSVM::ONE_CLASS ? 1 : 0;
 
     if( class_count )
     {
@@ -2454,7 +2466,6 @@ void CvSVM::read_params( CvFileStorage* fs, CvFileNode* svm_node )
     __END__;
 }
 
-
 void CvSVM::read( CvFileStorage* fs, CvFileNode* svm_node )
 {
     const double not_found_dbl = DBL_MAX;
@@ -2483,7 +2494,7 @@ void CvSVM::read( CvFileStorage* fs, CvFileNode* svm_node )
     var_count = cvReadIntByName( fs, svm_node, "var_count", var_all );
     class_count = cvReadIntByName( fs, svm_node, "class_count", 0 );
 
-    if( sv_total <= 0 || var_all <= 0 || var_count <= 0 || var_count > var_all || class_count < 0 )
+    if( !isSvmModelApplicable(sv_total, var_all, var_count, class_count) )
         CV_ERROR( CV_StsParseError, "SVM model data is invalid, check sv_count, var_* and class_count tags" );
 
     CV_CALL( class_labels = (CvMat*)cvReadByName( fs, svm_node, "class_labels" ));

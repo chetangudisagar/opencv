@@ -75,8 +75,8 @@ static void sortCorners_caller(oclMat& corners, const int count)
     Context * cxt = Context::getContext();
     int     GS = count/2;
     int     LS = min(255,GS);
-    size_t  globalThreads[3] = {GS, 1, 1};
-    size_t  localThreads[3]  = {LS, 1, 1};
+    size_t  globalThreads[3] = {(size_t)GS, 1, 1};
+    size_t  localThreads[3]  = {(size_t)LS, 1, 1};
 
     // 2^numStages should be equal to count or the output is invalid
     int numStages = 0;
@@ -110,7 +110,6 @@ static void findCorners_caller(
     oclMat&         counter)        //output value with number of detected corners, have to be 0 before call
 {
     string  opt;
-    std::vector<int> k;
     Context * cxt = Context::getContext();
 
     std::vector< std::pair<size_t, const void*> > args;
@@ -131,7 +130,7 @@ static void findCorners_caller(
     args.push_back(make_pair( sizeof(cl_int),   (void*)&corners.cols ));
     args.push_back(make_pair( sizeof(cl_mem),   (void*)&counter.data ));
 
-    size_t globalThreads[3] = {eig_mat.cols, eig_mat.rows, 1};
+    size_t globalThreads[3] = {(size_t)eig_mat.cols, (size_t)eig_mat.rows, 1};
     size_t localThreads[3]  = {16, 16, 1};
     if(!mask.empty())
         opt += " -D WITH_MASK=1";
@@ -146,34 +145,33 @@ static void minMaxEig_caller(const oclMat &src, oclMat &dst, oclMat & tozero)
     CV_Assert(groupnum != 0);
 
     int dbsize = groupnum * 2 * src.elemSize();
-
     ensureSizeIsEnough(1, dbsize, CV_8UC1, dst);
 
     cl_mem dst_data = reinterpret_cast<cl_mem>(dst.data);
 
-    int all_cols = src.step / src.elemSize();
-    int pre_cols = (src.offset % src.step) / src.elemSize();
-    int sec_cols = all_cols - (src.offset % src.step + src.cols * src.elemSize() - 1) / src.elemSize() - 1;
-    int invalid_cols = pre_cols + sec_cols;
-    int cols = all_cols - invalid_cols , elemnum = cols * src.rows;
-    int offset = src.offset / src.elemSize();
+    int vElemSize = src.elemSize1();
+    int src_step = src.step / vElemSize, src_offset = src.offset / vElemSize;
+    int total = src.size().area();
 
-    {// first parallel pass
+    {
+        // first parallel pass
         vector<pair<size_t , const void *> > args;
         args.push_back( make_pair( sizeof(cl_mem) , (void *)&src.data));
-        args.push_back( make_pair( sizeof(cl_mem) , (void *)&dst_data ));
-        args.push_back( make_pair( sizeof(cl_int) , (void *)&cols ));
-        args.push_back( make_pair( sizeof(cl_int) , (void *)&invalid_cols ));
-        args.push_back( make_pair( sizeof(cl_int) , (void *)&offset));
-        args.push_back( make_pair( sizeof(cl_int) , (void *)&elemnum));
+        args.push_back( make_pair( sizeof(cl_int) , (void *)&src_step));
+        args.push_back( make_pair( sizeof(cl_int) , (void *)&src_offset));
+        args.push_back( make_pair( sizeof(cl_int) , (void *)&src.rows ));
+        args.push_back( make_pair( sizeof(cl_int) , (void *)&src.cols ));
+        args.push_back( make_pair( sizeof(cl_int) , (void *)&total));
         args.push_back( make_pair( sizeof(cl_int) , (void *)&groupnum));
-        size_t globalThreads[3] = {groupnum * 256, 1, 1};
+        args.push_back( make_pair( sizeof(cl_mem) , (void *)&dst_data ));
+        size_t globalThreads[3] = {(size_t)groupnum * 256, 1, 1};
         size_t localThreads[3] = {256, 1, 1};
         openCLExecuteKernel(src.clCxt, &arithm_minMax, "arithm_op_minMax", globalThreads, localThreads,
-                            args, -1, -1, "-D T=float -D DEPTH_5");
+                            args, -1, -1, "-D T=float -D DEPTH_5 -D vlen=1");
     }
 
-    {// run final "serial" kernel to find accumulate results from threads and reset corner counter
+    {
+        // run final "serial" kernel to find accumulate results from threads and reset corner counter
         vector<pair<size_t , const void *> > args;
         args.push_back( make_pair( sizeof(cl_mem) , (void *)&dst_data ));
         args.push_back( make_pair( sizeof(cl_int) , (void *)&groupnum ));

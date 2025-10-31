@@ -52,6 +52,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <windowsx.h>
 
 #ifdef HAVE_OPENGL
 #include <memory>
@@ -249,6 +250,7 @@ CV_IMPL int cvInitSystem( int, char** )
 
         wasInitialized = 1;
     }
+    setlocale(LC_NUMERIC,"C");
 
     return 0;
 }
@@ -1435,8 +1437,6 @@ static LRESULT CALLBACK HighGUIProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
         if( window->on_mouse )
         {
             POINT pt;
-            RECT rect;
-            SIZE size = {0,0};
 
             int flags = (wParam & MK_LBUTTON ? CV_EVENT_FLAG_LBUTTON : 0)|
                         (wParam & MK_RBUTTON ? CV_EVENT_FLAG_RBUTTON : 0)|
@@ -1459,15 +1459,26 @@ static LRESULT CALLBACK HighGUIProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
             if( uMsg == WM_LBUTTONUP || uMsg == WM_RBUTTONUP || uMsg == WM_MBUTTONUP )
                 ReleaseCapture();
 
-            pt.x = LOWORD( lParam );
-            pt.y = HIWORD( lParam );
+            pt.x = GET_X_LPARAM( lParam );
+            pt.y = GET_Y_LPARAM( lParam );
 
-            GetClientRect( window->hwnd, &rect );
-            icvGetBitmapData( window, &size, 0, 0 );
+            if (window->flags & CV_WINDOW_AUTOSIZE)
+            {
+                // As user can't change window size, do not scale window coordinates. Underlying windowing system
+                // may prevent full window from being displayed and in this case coordinates should not be scaled.
+                window->on_mouse( event, pt.x, pt.y, flags, window->on_mouse_param );
+            } else {
+                // Full window is displayed using different size. Scale coordinates to match underlying positions.
+                RECT rect;
+                SIZE size = {0, 0};
 
-            window->on_mouse( event, pt.x*size.cx/MAX(rect.right - rect.left,1),
-                                     pt.y*size.cy/MAX(rect.bottom - rect.top,1), flags,
-                                     window->on_mouse_param );
+                GetClientRect( window->hwnd, &rect );
+                icvGetBitmapData( window, &size, 0, 0 );
+
+                window->on_mouse( event, pt.x*size.cx/MAX(rect.right - rect.left,1),
+                                         pt.y*size.cy/MAX(rect.bottom - rect.top,1), flags,
+                                         window->on_mouse_param );
+            }
         }
         break;
 
@@ -1816,7 +1827,7 @@ icvCreateTrackbar( const char* trackbar_name, const char* window_name,
     if( !window_name || !trackbar_name )
         CV_ERROR( CV_StsNullPtr, "NULL window or trackbar name" );
 
-    if( count <= 0 )
+    if( count < 0 )
         CV_ERROR( CV_StsOutOfRange, "Bad trackbar maximal value" );
 
     window = icvFindWindowByName(window_name);
@@ -1837,9 +1848,14 @@ icvCreateTrackbar( const char* trackbar_name, const char* window_name,
         {
             const int default_height = 30;
 
-            window->toolbar.toolbar = CreateToolbarEx(
-                    window->frame, WS_CHILD | CCS_TOP | TBSTYLE_WRAPABLE,
-                    1, 0, 0, 0, 0, 0, 16, 20, 16, 16, sizeof(TBBUTTON));
+            // CreateToolbarEx is deprecated and forces linking against Comctl32.lib.
+            window->toolbar.toolbar = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
+                                        WS_CHILD | CCS_TOP | TBSTYLE_WRAPABLE | BTNS_AUTOSIZE | BTNS_BUTTON,
+                                        0, 0, 0, 0,
+                                        window->frame, NULL, GetModuleHandle(NULL), NULL);
+            // CreateToolbarEx automatically sends this but CreateWindowEx doesn't.
+            SendMessage(window->toolbar.toolbar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
+
             GetClientRect(window->frame, &rect);
             MoveWindow( window->toolbar.toolbar, 0, 0,
                         rect.right - rect.left, default_height, TRUE);
@@ -2085,6 +2101,39 @@ CV_IMPL void cvSetTrackbarPos( const char* trackbar_name, const char* window_nam
 
     __END__;
 }
+
+
+CV_IMPL void cvSetTrackbarMax(const char* trackbar_name, const char* window_name, int maxval)
+{
+    CV_FUNCNAME( "cvSetTrackbarMax" );
+
+    __BEGIN__;
+
+    if (maxval >= 0)
+    {
+        CvWindow* window = 0;
+        CvTrackbar* trackbar = 0;
+        if (trackbar_name == 0 || window_name == 0)
+        {
+            CV_ERROR(CV_StsNullPtr, "NULL trackbar or window name");
+        }
+
+        window = icvFindWindowByName(window_name);
+        if (window)
+        {
+            trackbar = icvFindTrackbarByName(window, trackbar_name);
+            if (trackbar)
+            {
+                // The position will be min(pos, maxval).
+                trackbar->maxval = maxval;
+                SendMessage(trackbar->hwnd, TBM_SETRANGEMAX, (WPARAM)TRUE, (LPARAM)maxval);
+            }
+        }
+    }
+
+    __END__;
+}
+
 
 
 CV_IMPL void* cvGetWindowHandle( const char* window_name )

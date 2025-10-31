@@ -41,7 +41,7 @@ if(BUILD_EXAMPLES AND OCV_DEPENDENCIES_FOUND)
 
     target_link_libraries(${the_target} ${OPENCV_LINKER_LIBS} ${OPENCV_GPU_SAMPLES_REQUIRED_DEPS})
 
-    if(HAVE_CUDA)
+    if(HAVE_CUDA AND NOT ANDROID)
       target_link_libraries(${the_target} ${CUDA_CUDA_LIBRARY})
     endif()
 
@@ -69,7 +69,33 @@ if(BUILD_EXAMPLES AND OCV_DEPENDENCIES_FOUND)
     endif()
   ENDMACRO()
 
+  # remove all matching elements from the list
+  MACRO(list_filterout lst regex)
+    foreach(item ${${lst}})
+      if(item MATCHES "${regex}")
+        list(REMOVE_ITEM ${lst} "${item}")
+      endif()
+    endforeach()
+  ENDMACRO()
+
   file(GLOB all_samples RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
+
+  if(NOT HAVE_OPENGL)
+    list(REMOVE_ITEM all_samples "opengl.cpp")
+  endif()
+
+  if(NOT HAVE_CUDA)
+    list(REMOVE_ITEM all_samples "opticalflow_nvidia_api.cpp")
+    list(REMOVE_ITEM all_samples "cascadeclassifier_nvidia_api.cpp")
+    list(REMOVE_ITEM all_samples "driver_api_multi.cpp")
+    list(REMOVE_ITEM all_samples "driver_api_stereo_multi.cpp")
+  endif()
+  if(NOT HAVE_CUDA
+      OR NOT HAVE_TBB
+      OR OpenCV_FOUND  # via find_package() there is no access to cvconfig.h
+  )
+    list(REMOVE_ITEM all_samples "pyrlk_optical_flow_multithreading.cpp")
+  endif()
 
   foreach(sample_filename ${all_samples})
     get_filename_component(sample ${sample_filename} NAME_WE)
@@ -80,9 +106,21 @@ if(BUILD_EXAMPLES AND OCV_DEPENDENCIES_FOUND)
   include("performance/CMakeLists.txt")
 endif()
 
-if (INSTALL_C_EXAMPLES AND NOT WIN32)
-  file(GLOB install_list *.c *.cpp *.jpg *.png *.data makefile.* build_all.sh *.dsp *.cmd )
+if (OCV_DEPENDENCIES_FOUND AND INSTALL_C_EXAMPLES AND NOT WIN32)
+  file(GLOB install_list *.c *.cpp *.jpg *.png *.data makefile.* build_all.sh *.dsp *.cmd *.txt)
+  if(NOT HAVE_OPENGL)
+    list_filterout(install_list ".*opengl.cpp")
+  endif()
+  if(NOT HAVE_CUDA)
+    list_filterout(install_list ".*opticalflow_nvidia_api.cpp")
+    list_filterout(install_list ".*cascadeclassifier_nvidia_api.cpp")
+    list_filterout(install_list ".*driver_api_multi.cpp")
+    list_filterout(install_list ".*driver_api_stereo_multi.cpp")
+  endif()
+  if(NOT HAVE_CUDA OR NOT HAVE_TBB)
+      list(REMOVE_ITEM install_list "pyrlk_optical_flow_multithreading.cpp")
+  endif()
   install(FILES ${install_list}
-          DESTINATION ${OPENCV_SAMPLES_SRC_INSTALL_PATH}/gpu
-          PERMISSIONS OWNER_READ GROUP_READ WORLD_READ COMPONENT samples)
+          DESTINATION "${OPENCV_SAMPLES_SRC_INSTALL_PATH}/gpu"
+          PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ COMPONENT samples)
 endif()

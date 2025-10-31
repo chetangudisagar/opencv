@@ -19,8 +19,26 @@ if(ANDROID)
     set(OPENCV_STATIC_LIBTYPE_CONFIGMAKE ${OPENCV_LIBTYPE_CONFIGMAKE})
   endif()
 
+  if (NOT COMMAND ANDROID_GET_ABI_RAWNAME)
+    macro( ANDROID_GET_ABI_RAWNAME TOOLCHAIN_FLAG VAR )
+      if( " ${TOOLCHAIN_FLAG}" STREQUAL " ARMEABI" )
+        set( ${VAR} "armeabi" )
+      elseif( " ${TOOLCHAIN_FLAG}" STREQUAL " ARMEABI_V7A" )
+        set( ${VAR} "armeabi-v7a" )
+      elseif( " ${TOOLCHAIN_FLAG}" STREQUAL " ARM64_V8A" )
+        set( ${VAR} "arm64-v8a" )
+      elseif( " ${TOOLCHAIN_FLAG}" STREQUAL " X86" )
+        set( ${VAR} "x86" )
+      elseif( " ${TOOLCHAIN_FLAG}" STREQUAL " MIPS" )
+        set( ${VAR} "mips" )
+      else()
+        set( ${VAR} "unknown" )
+      endif()
+    endmacro()
+  endif()
+
   # setup lists of camera libs
-  foreach(abi ARMEABI ARMEABI_V7A X86 MIPS)
+  foreach(abi ARMEABI ARMEABI_V7A ARM64_V8A X86 MIPS)
     ANDROID_GET_ABI_RAWNAME(${abi} ndkabi)
     if(BUILD_ANDROID_CAMERA_WRAPPER)
       if(ndkabi STREQUAL ANDROID_NDK_ABI_NAME)
@@ -30,6 +48,7 @@ if(ANDROID)
       endif()
     elseif(HAVE_opencv_androidcamera)
       set(OPENCV_CAMERA_LIBS_${abi}_CONFIGCMAKE "")
+      # TODO: add prebuild camera libs for arm64-v8a
       file(GLOB OPENCV_CAMERA_LIBS "${OpenCV_SOURCE_DIR}/3rdparty/lib/${ndkabi}/libnative_camera_r*.so")
       if(OPENCV_CAMERA_LIBS)
         list(SORT OPENCV_CAMERA_LIBS)
@@ -56,8 +75,11 @@ if(ANDROID)
 
   # remove CUDA runtime and NPP from regular deps
   # it can be added separately if needed.
-  ocv_list_filterout(OPENCV_EXTRA_COMPONENTS_CONFIGMAKE "libcu")
-  ocv_list_filterout(OPENCV_EXTRA_COMPONENTS_CONFIGMAKE "libnpp")
+  ocv_list_filterout(OPENCV_EXTRA_COMPONENTS_CONFIGMAKE "cusparse")
+  ocv_list_filterout(OPENCV_EXTRA_COMPONENTS_CONFIGMAKE "cufft")
+  ocv_list_filterout(OPENCV_EXTRA_COMPONENTS_CONFIGMAKE "cublas")
+  ocv_list_filterout(OPENCV_EXTRA_COMPONENTS_CONFIGMAKE "npp")
+  ocv_list_filterout(OPENCV_EXTRA_COMPONENTS_CONFIGMAKE "cudart")
 
   if(HAVE_CUDA)
     # CUDA runtime libraries and are required always
@@ -128,7 +150,7 @@ if(ANDROID)
   set(OPENCV_LIBS_DIR_CONFIGCMAKE "\$(OPENCV_THIS_DIR)/lib/\$(OPENCV_TARGET_ARCH_ABI)")
   set(OPENCV_3RDPARTY_LIBS_DIR_CONFIGCMAKE "\$(OPENCV_THIS_DIR)/3rdparty/lib/\$(OPENCV_TARGET_ARCH_ABI)")
 
-  configure_file("${OpenCV_SOURCE_DIR}/cmake/templates/OpenCV.mk.in" "${CMAKE_BINARY_DIR}/OpenCV.mk" IMMEDIATE @ONLY)
+  configure_file("${OpenCV_SOURCE_DIR}/cmake/templates/OpenCV.mk.in" "${CMAKE_BINARY_DIR}/OpenCV.mk" @ONLY)
 
   # -------------------------------------------------------------------------------------------
   #  Part 2/2: ${BIN_DIR}/unix-install/OpenCV.mk -> For use with "make install"
@@ -138,6 +160,6 @@ if(ANDROID)
   set(OPENCV_LIBS_DIR_CONFIGCMAKE "\$(OPENCV_THIS_DIR)/../libs/\$(OPENCV_TARGET_ARCH_ABI)")
   set(OPENCV_3RDPARTY_LIBS_DIR_CONFIGCMAKE "\$(OPENCV_THIS_DIR)/../3rdparty/libs/\$(OPENCV_TARGET_ARCH_ABI)")
 
-  configure_file("${OpenCV_SOURCE_DIR}/cmake/templates/OpenCV.mk.in" "${CMAKE_BINARY_DIR}/unix-install/OpenCV.mk" IMMEDIATE @ONLY)
+  configure_file("${OpenCV_SOURCE_DIR}/cmake/templates/OpenCV.mk.in" "${CMAKE_BINARY_DIR}/unix-install/OpenCV.mk" @ONLY)
   install(FILES ${CMAKE_BINARY_DIR}/unix-install/OpenCV.mk DESTINATION ${OPENCV_CONFIG_INSTALL_PATH} COMPONENT dev)
 endif(ANDROID)

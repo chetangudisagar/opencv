@@ -31,11 +31,11 @@
             opencl_module = GetModuleHandleA("OpenCL.dll");
             if (!opencl_module)
             {
-                const char* name = "OpenCL.dll";
+                const char* libName = "OpenCL.dll";
                 const char* envOpenCLBinary = getenv("OPENCV_OPENCL_BINARY");
                 if (envOpenCLBinary)
-                    name = envOpenCLBinary;
-                opencl_module = LoadLibraryA(name);
+                    libName = envOpenCLBinary;
+                opencl_module = LoadLibraryA(libName);
                 if (!opencl_module)
                     return NULL;
             }
@@ -45,7 +45,7 @@
     #define CV_CL_GET_PROC_ADDRESS(name) WinGetProcAddress(name)
 #endif // _WIN32
 
-#if defined(linux)
+#if defined(__linux__)
     #include <dlfcn.h>
     #include <stdio.h>
 

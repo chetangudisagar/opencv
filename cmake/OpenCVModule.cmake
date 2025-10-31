@@ -27,7 +27,8 @@
 # The verbose template for OpenCV module:
 #
 #   ocv_add_module(modname <dependencies>)
-#   ocv_glob_module_sources() or glob them manually and ocv_set_module_sources(...)
+#   ocv_glob_module_sources(([EXCLUDE_CUDA] <extra sources&headers>)
+#                          or glob them manually and ocv_set_module_sources(...)
 #   ocv_module_include_directories(<extra include directories>)
 #   ocv_create_module()
 #   <add extra link dependencies, compiler options, etc>
@@ -48,6 +49,8 @@ foreach(mod ${OPENCV_MODULES_BUILD} ${OPENCV_MODULES_DISABLED_USER} ${OPENCV_MOD
   if(HAVE_${mod})
     unset(HAVE_${mod} CACHE)
   endif()
+  unset(OPENCV_MODULE_${mod}_DEPS CACHE)
+  unset(OPENCV_MODULE_${mod}_DEPS_EXT CACHE)
   unset(OPENCV_MODULE_${mod}_REQ_DEPS CACHE)
   unset(OPENCV_MODULE_${mod}_OPT_DEPS CACHE)
   unset(OPENCV_MODULE_${mod}_PRIVATE_REQ_DEPS CACHE)
@@ -105,7 +108,6 @@ endmacro()
 #   ocv_add_module(yaom INTERNAL opencv_core opencv_highgui opencv_flann OPTIONAL opencv_gpu)
 macro(ocv_add_module _name)
   string(TOLOWER "${_name}" name)
-  string(REGEX REPLACE "^opencv_" "" ${name} "${name}")
   set(the_module opencv_${name})
 
   # the first pass - collect modules info, the second pass - create targets
@@ -135,13 +137,13 @@ macro(ocv_add_module _name)
 
     # parse list of dependencies
     if("${ARGV1}" STREQUAL "INTERNAL" OR "${ARGV1}" STREQUAL "BINDINGS")
-      set(OPENCV_MODULE_${the_module}_CLASS "${ARGV1}" CACHE INTERNAL "The cathegory of the module")
+      set(OPENCV_MODULE_${the_module}_CLASS "${ARGV1}" CACHE INTERNAL "The category of the module")
       set(__ocv_argn__ ${ARGN})
       list(REMOVE_AT __ocv_argn__ 0)
       ocv_add_dependencies(${the_module} ${__ocv_argn__})
       unset(__ocv_argn__)
     else()
-      set(OPENCV_MODULE_${the_module}_CLASS "PUBLIC" CACHE INTERNAL "The cathegory of the module")
+      set(OPENCV_MODULE_${the_module}_CLASS "PUBLIC" CACHE INTERNAL "The category of the module")
       ocv_add_dependencies(${the_module} ${ARGN})
       if(BUILD_${the_module})
         set(OPENCV_MODULES_PUBLIC ${OPENCV_MODULES_PUBLIC} "${the_module}" CACHE INTERNAL "List of OpenCV modules marked for export")
@@ -168,6 +170,10 @@ macro(ocv_add_module _name)
       return() # extra protection from redefinition
     endif()
     project(${the_module})
+    add_definitions(
+        -D_USE_MATH_DEFINES  # M_PI constant in MSVS
+        -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS  # to use C libraries from C++ code (ffmpeg)
+    )
   endif(OPENCV_INITIAL_PASS)
 endmacro()
 
@@ -478,22 +484,38 @@ endmacro()
 
 # finds and sets headers and sources for the standard OpenCV module
 # Usage:
-# ocv_glob_module_sources(<extra sources&headers in the same format as used in ocv_set_module_sources>)
+# ocv_glob_module_sources([EXCLUDE_CUDA] <extra sources&headers in the same format as used in ocv_set_module_sources>)
 macro(ocv_glob_module_sources)
+  set(_argn ${ARGN})
+  list(FIND _argn "EXCLUDE_CUDA" exclude_cuda)
+  if(NOT exclude_cuda EQUAL -1)
+    list(REMOVE_AT _argn ${exclude_cuda})
+  endif()
+
   file(GLOB_RECURSE lib_srcs "src/*.cpp")
   file(GLOB_RECURSE lib_int_hdrs "src/*.hpp" "src/*.h")
-  file(GLOB lib_hdrs "include/opencv2/${name}/*.hpp" "include/opencv2/${name}/*.h")
+  file(GLOB lib_hdrs "include/opencv2/*.hpp" "include/opencv2/${name}/*.hpp" "include/opencv2/${name}/*.h")
   file(GLOB lib_hdrs_detail "include/opencv2/${name}/detail/*.hpp" "include/opencv2/${name}/detail/*.h")
+  file(GLOB_RECURSE lib_srcs_apple "src/*.mm")
+  if (APPLE)
+    list(APPEND lib_srcs ${lib_srcs_apple})
+  endif()
 
-  file(GLOB lib_cuda_srcs "src/cuda/*.cu")
-  set(cuda_objs "")
-  set(lib_cuda_hdrs "")
-  if(HAVE_CUDA)
-    ocv_include_directories(${CUDA_INCLUDE_DIRS})
-    file(GLOB lib_cuda_hdrs "src/cuda/*.hpp")
+  if (exclude_cuda EQUAL -1)
+    file(GLOB lib_cuda_srcs "src/cuda/*.cu")
+    set(cuda_objs "")
+    set(lib_cuda_hdrs "")
+    if(HAVE_CUDA)
+      ocv_include_directories(${CUDA_INCLUDE_DIRS})
+      file(GLOB lib_cuda_hdrs "src/cuda/*.hpp")
 
-    ocv_cuda_compile(cuda_objs ${lib_cuda_srcs} ${lib_cuda_hdrs})
-    source_group("Src\\Cuda"      FILES ${lib_cuda_srcs} ${lib_cuda_hdrs})
+      ocv_cuda_compile(cuda_objs ${lib_cuda_srcs} ${lib_cuda_hdrs})
+      source_group("Src\\Cuda"      FILES ${lib_cuda_srcs} ${lib_cuda_hdrs})
+    endif()
+  else()
+    set(cuda_objs "")
+    set(lib_cuda_srcs "")
+    set(lib_cuda_hdrs "")
   endif()
 
   source_group("Src" FILES ${lib_srcs} ${lib_int_hdrs})
@@ -509,11 +531,33 @@ macro(ocv_glob_module_sources)
     list(APPEND lib_srcs ${cl_kernels} "${CMAKE_CURRENT_BINARY_DIR}/opencl_kernels.cpp" "${CMAKE_CURRENT_BINARY_DIR}/opencl_kernels.hpp")
   endif()
 
+  if(ENABLE_AVX)
+    file(GLOB avx_srcs "src/avx/*.cpp")
+    foreach(src ${avx_srcs})
+      if(CMAKE_COMPILER_IS_GNUCXX)
+        set_source_files_properties(${src} PROPERTIES COMPILE_FLAGS -mavx)
+      elseif(MSVC AND NOT MSVC_VERSION LESS 1600)
+        set_source_files_properties(${src} PROPERTIES COMPILE_FLAGS /arch:AVX)
+      endif()
+    endforeach()
+  endif()
+
+  if(ENABLE_AVX2)
+    file(GLOB avx2_srcs "src/avx2/*.cpp")
+    foreach(src ${avx2_srcs})
+      if(CMAKE_COMPILER_IS_GNUCXX)
+        set_source_files_properties(${src} PROPERTIES COMPILE_FLAGS -mavx2)
+      elseif(MSVC AND NOT MSVC_VERSION LESS 1800)
+        set_source_files_properties(${src} PROPERTIES COMPILE_FLAGS /arch:AVX2)
+      endif()
+    endforeach()
+  endif()
+
   source_group("Include" FILES ${lib_hdrs})
   source_group("Include\\detail" FILES ${lib_hdrs_detail})
 
-  ocv_set_module_sources(${ARGN} HEADERS ${lib_hdrs} ${lib_hdrs_detail}
-                                 SOURCES ${lib_srcs} ${lib_int_hdrs} ${cuda_objs} ${lib_cuda_srcs} ${lib_cuda_hdrs})
+  ocv_set_module_sources(${_argn} HEADERS ${lib_hdrs} ${lib_hdrs_detail}
+                         SOURCES ${lib_srcs} ${lib_int_hdrs} ${cuda_objs} ${lib_cuda_srcs} ${lib_cuda_hdrs})
 endmacro()
 
 # creates OpenCV module in current folder
@@ -534,9 +578,12 @@ macro(ocv_create_module)
     ${${the_module}_pch})
 
   if(NOT "${ARGN}" STREQUAL "SKIP_LINK")
-    target_link_libraries(${the_module} ${OPENCV_MODULE_${the_module}_DEPS})
-    target_link_libraries(${the_module} LINK_INTERFACE_LIBRARIES ${OPENCV_MODULE_${the_module}_DEPS})
-    target_link_libraries(${the_module} ${OPENCV_MODULE_${the_module}_DEPS_EXT} ${OPENCV_LINKER_LIBS} ${IPP_LIBS} ${ARGN})
+    target_link_libraries(${the_module} LINK_PUBLIC ${OPENCV_MODULE_${the_module}_DEPS})
+    target_link_libraries(${the_module} LINK_PUBLIC ${OPENCV_MODULE_${the_module}_DEPS})
+    set(extra_deps ${OPENCV_MODULE_${the_module}_DEPS_EXT} ${OPENCV_LINKER_LIBS} ${IPP_LIBS} ${ARGN})
+    ocv_extract_simple_libs(extra_deps _simple_deps _other_deps)
+    target_link_libraries(${the_module} LINK_PRIVATE ${_simple_deps}) # this list goes to "export"
+    target_link_libraries(${the_module} LINK_PRIVATE ${extra_deps})
   endif()
 
   add_dependencies(opencv_modules ${the_module})
@@ -548,10 +595,12 @@ macro(ocv_create_module)
   set_target_properties(${the_module} PROPERTIES
     OUTPUT_NAME "${the_module}${OPENCV_DLLVERSION}"
     DEBUG_POSTFIX "${OPENCV_DEBUG_POSTFIX}"
+    COMPILE_PDB_NAME "${the_module}${OPENCV_DLLVERSION}"
+    COMPILE_PDB_NAME_DEBUG "${the_module}${OPENCV_DLLVERSION}${OPENCV_DEBUG_POSTFIX}"
     ARCHIVE_OUTPUT_DIRECTORY ${LIBRARY_OUTPUT_PATH}
+    COMPILE_PDB_OUTPUT_DIRECTORY ${LIBRARY_OUTPUT_PATH}
     LIBRARY_OUTPUT_DIRECTORY ${LIBRARY_OUTPUT_PATH}
     RUNTIME_OUTPUT_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}
-    INSTALL_NAME_DIR lib
   )
 
   # For dynamic link numbering convenions
@@ -578,15 +627,20 @@ macro(ocv_create_module)
 
   ocv_install_target(${the_module} EXPORT OpenCVModules
     RUNTIME DESTINATION ${OPENCV_BIN_INSTALL_PATH} COMPONENT libs
-    LIBRARY DESTINATION ${OPENCV_LIB_INSTALL_PATH} COMPONENT libs
+    LIBRARY DESTINATION ${OPENCV_LIB_INSTALL_PATH} COMPONENT libs NAMELINK_SKIP
     ARCHIVE DESTINATION ${OPENCV_LIB_INSTALL_PATH} COMPONENT dev
     )
+  get_target_property(_target_type ${the_module} TYPE)
+  if("${_target_type}" STREQUAL "SHARED_LIBRARY")
+    install(TARGETS ${the_module}
+      LIBRARY DESTINATION ${OPENCV_LIB_INSTALL_PATH} COMPONENT dev NAMELINK_ONLY)
+  endif()
 
   # only "public" headers need to be installed
   if(OPENCV_MODULE_${the_module}_HEADERS AND ";${OPENCV_MODULES_PUBLIC};" MATCHES ";${the_module};")
     foreach(hdr ${OPENCV_MODULE_${the_module}_HEADERS})
       string(REGEX REPLACE "^.*opencv2/" "opencv2/" hdr2 "${hdr}")
-      if(hdr2 MATCHES "^(opencv2/.*)/[^/]+.h(..)?$")
+      if(hdr2 MATCHES "^(opencv2/?.*)/[^/]+.h(..)?$")
         install(FILES ${hdr} DESTINATION "${OPENCV_INCLUDE_INSTALL_PATH}/${CMAKE_MATCH_1}" COMPONENT dev)
       endif()
     endforeach()
@@ -612,11 +666,20 @@ endmacro()
 # short command for adding simple OpenCV module
 # see ocv_add_module for argument details
 # Usage:
-# ocv_define_module(module_name  [INTERNAL] [REQUIRED] [<list of dependencies>] [OPTIONAL <list of optional dependencies>])
+# ocv_define_module(module_name  [INTERNAL] [EXCLUDE_CUDA] [REQUIRED] [<list of dependencies>] [OPTIONAL <list of optional dependencies>])
 macro(ocv_define_module module_name)
-  ocv_add_module(${module_name} ${ARGN})
+  set(_argn ${ARGN})
+  set(exclude_cuda "")
+  foreach(arg ${_argn})
+    if("${arg}" STREQUAL "EXCLUDE_CUDA")
+      set(exclude_cuda "${arg}")
+      list(REMOVE_ITEM _argn ${arg})
+    endif()
+  endforeach()
+
+  ocv_add_module(${module_name} ${_argn})
   ocv_module_include_directories()
-  ocv_glob_module_sources()
+  ocv_glob_module_sources(${exclude_cuda})
   ocv_create_module()
   ocv_add_precompiled_headers(${the_module})
 
@@ -654,7 +717,7 @@ macro(__ocv_parse_test_sources tests_type)
       set(__file_group_sources "")
     elseif(arg STREQUAL "DEPENDS_ON")
       set(__currentvar "OPENCV_TEST_${the_module}_DEPS")
-    elseif("${__currentvar}" STREQUAL "__file_group_sources" AND NOT __file_group_name)
+    elseif(" ${__currentvar}" STREQUAL " __file_group_sources" AND NOT __file_group_name) # spaces to avoid CMP0054
       set(__file_group_name "${arg}")
     else()
       list(APPEND ${__currentvar} "${arg}")
@@ -708,6 +771,22 @@ function(ocv_add_perf_tests)
 
       ocv_add_precompiled_headers(${the_target})
 
+      if(CMAKE_VERSION VERSION_GREATER "2.8" AND OPENCV_TEST_DATA_PATH)
+        add_test(NAME ${the_target} COMMAND ${the_target} --perf_min_samples=1 --perf_force_samples=1 --perf_verify_sanity)
+
+        get_filename_component(cur_modules_loc "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+        get_filename_component(default_modules_loc "${CMAKE_SOURCE_DIR}/modules" ABSOLUTE)
+        if("${cur_modules_loc}" STREQUAL "${default_modules_loc}")
+          set(test_category "Public")
+        else()
+          set(test_category "Extra")
+        endif()
+
+        set_tests_properties(${the_target} PROPERTIES
+          LABELS "${test_category};Sanity"
+          ENVIRONMENT "OPENCV_TEST_DATA_PATH=${OPENCV_TEST_DATA_PATH}")
+      endif()
+
     else(OCV_DEPENDENCIES_FOUND)
       # TODO: warn about unsatisfied dependencies
     endif(OCV_DEPENDENCIES_FOUND)
@@ -744,8 +823,8 @@ function(ocv_add_accuracy_tests)
       endif()
 
       get_native_precompiled_header(${the_target} test_precomp.hpp)
-
       add_executable(${the_target} ${OPENCV_TEST_${the_module}_SOURCES} ${${the_target}_pch})
+
       target_link_libraries(${the_target} ${OPENCV_MODULE_${the_module}_DEPS} ${test_deps} ${OPENCV_LINKER_LIBS})
       add_dependencies(opencv_tests ${the_target})
 
@@ -759,11 +838,24 @@ function(ocv_add_accuracy_tests)
         set_target_properties(${the_target} PROPERTIES FOLDER "tests accuracy")
       endif()
 
-      enable_testing()
-      get_target_property(LOC ${the_target} LOCATION)
-      add_test(${the_target} "${LOC}")
-
       ocv_add_precompiled_headers(${the_target})
+
+      if(CMAKE_VERSION VERSION_GREATER "2.8" AND OPENCV_TEST_DATA_PATH AND NOT "${the_target}" MATCHES "opencv_test_viz")
+        add_test(NAME ${the_target} COMMAND ${the_target})
+
+        get_filename_component(cur_modules_loc "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+        get_filename_component(default_modules_loc "${CMAKE_SOURCE_DIR}/modules" ABSOLUTE)
+        if("${cur_modules_loc}" STREQUAL "${default_modules_loc}")
+          set(test_category "Public")
+        else()
+          set(test_category "Extra")
+        endif()
+
+        set_tests_properties(${the_target} PROPERTIES
+          LABELS "${test_category};Accuracy"
+          ENVIRONMENT "OPENCV_TEST_DATA_PATH=${OPENCV_TEST_DATA_PATH}")
+      endif()
+
     else(OCV_DEPENDENCIES_FOUND)
       # TODO: warn about unsatisfied dependencies
     endif(OCV_DEPENDENCIES_FOUND)
@@ -812,7 +904,7 @@ function(ocv_add_samples)
     file(GLOB sample_files "${samples_path}/*")
     install(FILES ${sample_files}
             DESTINATION ${OPENCV_SAMPLES_SRC_INSTALL_PATH}/${module_id}
-            PERMISSIONS OWNER_READ GROUP_READ WORLD_READ COMPONENT samples)
+            PERMISSIONS OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ COMPONENT samples)
   endif()
 endfunction()
 
@@ -838,25 +930,28 @@ macro(__ocv_track_module_link_dependencies the_module optkind)
       list(REMOVE_AT __mod_depends 0)
       if(__dep STREQUAL the_module)
         set(__has_cycle TRUE)
-      else()#if("${OPENCV_MODULES_BUILD}" MATCHES "(^|;)${__dep}(;|$)")
+      else()
         ocv_regex_escape(__rdep "${__dep}")
         if(__resolved_deps MATCHES "(^|;)${__rdep}(;|$)")
           #all dependencies of this module are already resolved
           list(APPEND ${the_module}_MODULE_DEPS_${optkind} "${__dep}")
-        else()
-          get_target_property(__module_type ${__dep} TYPE)
-          if(__module_type STREQUAL "STATIC_LIBRARY")
-            if(NOT DEFINED ${__dep}_LIB_DEPENDS_${optkind})
-              ocv_split_libs_list(${__dep}_LIB_DEPENDS ${__dep}_LIB_DEPENDS_DBG ${__dep}_LIB_DEPENDS_OPT)
+        elseif(TARGET ${__dep})
+          get_target_property(__dep_imported ${__dep} IMPORTED)
+          if(__dep_imported)
+            list(APPEND ${the_module}_EXTRA_DEPS_${optkind} "${__dep}")
+          else()
+            get_target_property(__module_type ${__dep} TYPE)
+            if(__module_type STREQUAL "STATIC_LIBRARY")
+              if(NOT DEFINED ${__dep}_LIB_DEPENDS_${optkind})
+                ocv_split_libs_list(${__dep}_LIB_DEPENDS ${__dep}_LIB_DEPENDS_DBG ${__dep}_LIB_DEPENDS_OPT)
+              endif()
+              list(INSERT __mod_depends 0 ${${__dep}_LIB_DEPENDS_${optkind}} ${__dep})
+              list(APPEND __resolved_deps "${__dep}")
             endif()
-            list(INSERT __mod_depends 0 ${${__dep}_LIB_DEPENDS_${optkind}} ${__dep})
-            list(APPEND __resolved_deps "${__dep}")
-          elseif(NOT __module_type)
-            list(APPEND  ${the_module}_EXTRA_DEPS_${optkind} "${__dep}")
           endif()
+        else()
+          list(APPEND  ${the_module}_EXTRA_DEPS_${optkind} "${__dep}")
         endif()
-      #else()
-       # get_target_property(__dep_location "${__dep}" LOCATION)
       endif()
     endwhile()
 
@@ -870,7 +965,7 @@ macro(__ocv_track_module_link_dependencies the_module optkind)
       list(APPEND ${the_module}_MODULE_DEPS_${optkind} "${the_module}")
     endif()
 
-    unset(__dep_location)
+    unset(__dep_imported)
     unset(__mod_depends)
     unset(__resolved_deps)
     unset(__has_cycle)

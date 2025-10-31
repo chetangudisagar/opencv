@@ -46,6 +46,10 @@ using namespace std;
 using namespace cv;
 using namespace cv::gpu;
 
+#if defined(__GNUC__) && (__GNUC__ * 10 + __GNUC_MINOR__ == 47)
+#   define CUDA_DISABLER
+#endif
+
 #if !defined (HAVE_CUDA) || defined (CUDA_DISABLER)
 
 Ptr<GeneralizedHough_GPU> cv::gpu::GeneralizedHough_GPU::create(int) { throw_nogpu(); return Ptr<GeneralizedHough_GPU>(); }
@@ -670,28 +674,6 @@ namespace
 
     /////////////////////////////////////////
     // POSITION & SCALE & ROTATION
-
-    double toRad(double a)
-    {
-        return a * CV_PI / 180.0;
-    }
-
-    double clampAngle(double a)
-    {
-        double res = a;
-
-        while (res > 360.0)
-            res -= 360.0;
-        while (res < 0)
-            res += 360.0;
-
-        return res;
-    }
-
-    bool angleEq(double a, double b, double eps = 1.0)
-    {
-        return (fabs(clampAngle(a - b)) <= eps);
-    }
 
     class GHT_Guil_Full : public GHT_Pos
     {

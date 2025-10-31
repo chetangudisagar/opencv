@@ -54,6 +54,12 @@
 #include "opencv2/objdetect/objdetect.hpp"
 #include "opencv2/features2d/features2d.hpp"
 
+// std::auto_ptr
+#if defined(__GNUC__) && __GNUC__ >= 6
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 namespace cv { namespace gpu {
 
 //////////////////////////////// CudaMem ////////////////////////////////
@@ -429,13 +435,13 @@ CV_EXPORTS void LUT(const GpuMat& src, const Mat& lut, GpuMat& dst, Stream& stre
 CV_EXPORTS void merge(const GpuMat* src, size_t n, GpuMat& dst, Stream& stream = Stream::Null());
 
 //! makes multi-channel array out of several single-channel arrays
-CV_EXPORTS void merge(const vector<GpuMat>& src, GpuMat& dst, Stream& stream = Stream::Null());
+CV_EXPORTS void merge(const std::vector<GpuMat>& src, GpuMat& dst, Stream& stream = Stream::Null());
 
 //! copies each plane of a multi-channel array to a dedicated array
 CV_EXPORTS void split(const GpuMat& src, GpuMat* dst, Stream& stream = Stream::Null());
 
 //! copies each plane of a multi-channel array to a dedicated array
-CV_EXPORTS void split(const GpuMat& src, vector<GpuMat>& dst, Stream& stream = Stream::Null());
+CV_EXPORTS void split(const GpuMat& src, std::vector<GpuMat>& dst, Stream& stream = Stream::Null());
 
 //! computes magnitude of complex (x(i).re, x(i).im) vector
 //! supports only CV_32FC2 type
@@ -537,7 +543,7 @@ CV_EXPORTS void log(const GpuMat& a, GpuMat& b, Stream& stream = Stream::Null())
 //! supports all, except depth == CV_64F
 CV_EXPORTS void pow(const GpuMat& src, double power, GpuMat& dst, Stream& stream = Stream::Null());
 
-//! compares elements of two arrays (c = a <cmpop> b)
+//! compares elements of two arrays (c = a \<cmpop\> b)
 CV_EXPORTS void compare(const GpuMat& a, const GpuMat& b, GpuMat& c, int cmpop, Stream& stream = Stream::Null());
 CV_EXPORTS void compare(const GpuMat& a, Scalar sc, GpuMat& c, int cmpop, Stream& stream = Stream::Null());
 
@@ -733,11 +739,11 @@ CV_EXPORTS void cornerMinEigenVal(const GpuMat& src, GpuMat& dst, GpuMat& Dx, Gp
     int borderType=BORDER_REFLECT101, Stream& stream = Stream::Null());
 
 //! performs per-element multiplication of two full (not packed) Fourier spectrums
-//! supports 32FC2 matrixes only (interleaved format)
+//! supports 32FC2 matrices only (interleaved format)
 CV_EXPORTS void mulSpectrums(const GpuMat& a, const GpuMat& b, GpuMat& c, int flags, bool conjB=false, Stream& stream = Stream::Null());
 
 //! performs per-element multiplication of two full (not packed) Fourier spectrums
-//! supports 32FC2 matrixes only (interleaved format)
+//! supports 32FC2 matrices only (interleaved format)
 CV_EXPORTS void mulAndScaleSpectrums(const GpuMat& a, const GpuMat& b, GpuMat& c, int flags, float scale, bool conjB=false, Stream& stream = Stream::Null());
 
 //! Performs a forward or inverse discrete Fourier transform (1D or 2D) of floating point matrix.
@@ -1262,9 +1268,9 @@ private:
 struct CV_EXPORTS HOGConfidence
 {
    double scale;
-   vector<Point> locations;
-   vector<double> confidences;
-   vector<double> part_scores[4];
+   std::vector<Point> locations;
+   std::vector<double> confidences;
+   std::vector<double> part_scores[4];
 };
 
 struct CV_EXPORTS HOGDescriptor
@@ -1282,27 +1288,27 @@ struct CV_EXPORTS HOGDescriptor
     size_t getDescriptorSize() const;
     size_t getBlockHistogramSize() const;
 
-    void setSVMDetector(const vector<float>& detector);
+    void setSVMDetector(const std::vector<float>& detector);
 
-    static vector<float> getDefaultPeopleDetector();
-    static vector<float> getPeopleDetector48x96();
-    static vector<float> getPeopleDetector64x128();
+    static std::vector<float> getDefaultPeopleDetector();
+    static std::vector<float> getPeopleDetector48x96();
+    static std::vector<float> getPeopleDetector64x128();
 
-    void detect(const GpuMat& img, vector<Point>& found_locations,
+    void detect(const GpuMat& img, std::vector<Point>& found_locations,
                 double hit_threshold=0, Size win_stride=Size(),
                 Size padding=Size());
 
-    void detectMultiScale(const GpuMat& img, vector<Rect>& found_locations,
+    void detectMultiScale(const GpuMat& img, std::vector<Rect>& found_locations,
                           double hit_threshold=0, Size win_stride=Size(),
                           Size padding=Size(), double scale0=1.05,
                           int group_threshold=2);
 
-    void computeConfidence(const GpuMat& img, vector<Point>& hits, double hit_threshold,
-                                                Size win_stride, Size padding, vector<Point>& locations, vector<double>& confidences);
+    void computeConfidence(const GpuMat& img, std::vector<Point>& hits, double hit_threshold,
+                                                Size win_stride, Size padding, std::vector<Point>& locations, std::vector<double>& confidences);
 
-    void computeConfidenceMultiScale(const GpuMat& img, vector<Rect>& found_locations,
+    void computeConfidenceMultiScale(const GpuMat& img, std::vector<Rect>& found_locations,
                                                                     double hit_threshold, Size win_stride, Size padding,
-                                                                    vector<HOGConfidence> &conf_out, int group_threshold);
+                                                                    std::vector<HOGConfidence> &conf_out, int group_threshold);
 
     void getDescriptors(const GpuMat& img, Size win_stride,
                         GpuMat& descriptors,
@@ -1580,7 +1586,7 @@ public:
     // all features have same size
     static const int FEATURE_SIZE = 7;
 
-    explicit FAST_GPU(int threshold, bool nonmaxSupression = true, double keypointsRatio = 0.05);
+    explicit FAST_GPU(int threshold, bool nonmaxSuppression = true, double keypointsRatio = 0.05);
 
     //! finds the keypoints using FAST detector
     //! supports only CV_8UC1 images
@@ -1596,19 +1602,19 @@ public:
     //! release temporary buffer's memory
     void release();
 
-    bool nonmaxSupression;
+    bool nonmaxSuppression;
 
     int threshold;
 
     //! max keypoints = keypointsRatio * img.size().area()
     double keypointsRatio;
 
-    //! find keypoints and compute it's response if nonmaxSupression is true
+    //! find keypoints and compute it's response if nonmaxSuppression is true
     //! return count of detected keypoints
     int calcKeyPointsLocation(const GpuMat& image, const GpuMat& mask);
 
     //! get final array of keypoints
-    //! performs nonmax supression if needed
+    //! performs nonmax suppression if needed
     //! return final count of keypoints
     int getKeyPoints(GpuMat& keypoints);
 
@@ -1670,10 +1676,10 @@ public:
     //! returns the descriptor size in bytes
     inline int descriptorSize() const { return kBytes; }
 
-    inline void setFastParams(int threshold, bool nonmaxSupression = true)
+    inline void setFastParams(int threshold, bool nonmaxSuppression = true)
     {
         fastDetector_.threshold = threshold;
-        fastDetector_.nonmaxSupression = nonmaxSupression;
+        fastDetector_.nonmaxSuppression = nonmaxSuppression;
     }
 
     //! release temporary buffer's memory
@@ -1818,6 +1824,9 @@ public:
     void sparse(const GpuMat& prevImg, const GpuMat& nextImg, const GpuMat& prevPts, GpuMat& nextPts,
         GpuMat& status, GpuMat* err = 0);
 
+    void sparse_multi(const GpuMat& prevImg, const GpuMat& nextImg, const GpuMat& prevPts, GpuMat& nextPts,
+        GpuMat& status, Stream& stream, GpuMat* err = 0);
+
     void dense(const GpuMat& prevImg, const GpuMat& nextImg, GpuMat& u, GpuMat& v, GpuMat* err = 0);
 
     void releaseMemory();
@@ -1832,11 +1841,11 @@ public:
 
 private:
     GpuMat uPyr_[2];
-    vector<GpuMat> prevPyr_;
-    vector<GpuMat> nextPyr_;
+    std::vector<GpuMat> prevPyr_;
+    std::vector<GpuMat> nextPyr_;
     GpuMat vPyr_[2];
-    vector<GpuMat> buf_;
-    vector<GpuMat> unused;
+    std::vector<GpuMat> buf_;
+    std::vector<GpuMat> unused;
     bool isDeviceArch11_;
 };
 
@@ -2264,6 +2273,7 @@ public:
      * model.
      * @param frame        Input frame
      * @param fgmask       Output mask image representing foreground and background pixels
+     * @param learningRate determines how quickly features are “forgotten” from histograms
      * @param stream       Stream for the asynchronous version
      */
     void operator ()(const GpuMat& frame, GpuMat& fgmask, float learningRate = -1.0f, Stream& stream = Stream::Null());
@@ -2443,7 +2453,7 @@ public:
         Uncompressed_YV12   = (('Y'<<24)|('V'<<16)|('1'<<8)|('2')),   // Y,V,U (4:2:0)
         Uncompressed_NV12   = (('N'<<24)|('V'<<16)|('1'<<8)|('2')),   // Y,UV  (4:2:0)
         Uncompressed_YUYV   = (('Y'<<24)|('U'<<16)|('Y'<<8)|('V')),   // YUYV/YUY2 (4:2:2)
-        Uncompressed_UYVY   = (('U'<<24)|('Y'<<16)|('V'<<8)|('Y')),   // UYVY (4:2:2)
+        Uncompressed_UYVY   = (('U'<<24)|('Y'<<16)|('V'<<8)|('Y'))    // UYVY (4:2:2)
     };
 
     enum ChromaFormat
@@ -2451,7 +2461,7 @@ public:
         Monochrome=0,
         YUV420,
         YUV422,
-        YUV444,
+        YUV444
     };
 
     struct FormatInfo
@@ -2525,5 +2535,9 @@ CV_EXPORTS void calcWobbleSuppressionMaps(
 } // namespace gpu
 
 } // namespace cv
+
+#if defined(__GNUC__) && __GNUC__ >= 6
+#pragma GCC diagnostic pop
+#endif
 
 #endif /* __OPENCV_GPU_HPP__ */

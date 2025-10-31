@@ -219,8 +219,8 @@ private:
 #ifdef MAKE_PARALLEL
 /******************************************************
 ** IF some parallelizing thread methods are available, then, main loops are parallelized using these functors
-** ==> main idea paralellise main filters loops, then, only the most used methods are parallelized... TODO : increase the number of parallelised methods as necessary
-** ==> functors names = Parallel_$$$ where $$$= the name of the serial method that is parallelised
+** ==> main idea parallelize main filters loops, then, only the most used methods are parallelized... TODO : increase the number of parallelized methods as necessary
+** ==> functors names = Parallel_$$$ where $$$= the name of the serial method that is parallelized
 ** ==> functors constructors can differ from the parameters used with their related serial functions
 */
     class Parallel_OPL_OnOffWaysComputing: public cv::ParallelLoopBody
@@ -241,7 +241,7 @@ private:
         float *parvocellularOutputON_PTR= parvocellularOutputON+r.start;
         float *parvocellularOutputOFF_PTR= parvocellularOutputOFF+r.start;
 
-            for (register int IDpixel=r.start ; IDpixel!=r.end ; ++IDpixel)
+            for (int IDpixel=r.start ; IDpixel!=r.end ; ++IDpixel)
         {
         float pixelDifference = *(photoreceptorsOutput_PTR++) -*(horizontalCellsOutput_PTR++);
         // test condition to allow write pixelDifference in ON or OFF buffer and 0 in the over

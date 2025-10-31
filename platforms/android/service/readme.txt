@@ -1,6 +1,8 @@
 How to select the proper version of OpenCV Manager
 --------------------------------------------------
 
+DEPRECATED: This information is outdated since OpenCV 2.4.12
+
 Since version 1.7 several packages of OpenCV Manager are built. Every package is targeted for some
 specific hardware platform and includes corresponding OpenCV binaries. So, in most cases OpenCV
 Manager uses built-in version of OpenCV. Separate package with OpenCV binaries is currently used in
@@ -14,20 +16,20 @@ manually using adb tool:
 
 .. code-block:: sh
 
-    adb install OpenCV-2.4.8-android-sdk/apk/OpenCV_2.4.8_Manager_2.16_<platform>.apk
+    adb install OpenCV-2.4.9-android-sdk/apk/OpenCV_2.4.9_Manager_2.18_<platform>.apk
 
 Use the table below to determine proper OpenCV Manager package for your device:
 
 +------------------------------+--------------+----------------------------------------------------+
 | Hardware Platform            | Android ver. | Package name                                       |
 +==============================+==============+====================================================+
-| armeabi-v7a (ARMv7-A + NEON) |    >= 2.3    | OpenCV_2.4.8_Manager_2.16_armv7a-neon.apk          |
+| armeabi-v7a (ARMv7-A + NEON) |    >= 2.3    | OpenCV_2.4.9_Manager_2.18_armv7a-neon.apk          |
 +------------------------------+--------------+----------------------------------------------------+
-| armeabi-v7a (ARMv7-A + NEON) |     = 2.2    | OpenCV_2.4.8_Manager_2.16_armv7a-neon-android8.apk |
+| armeabi-v7a (ARMv7-A + NEON) |     = 2.2    | OpenCV_2.4.9_Manager_2.18_armv7a-neon-android8.apk |
 +------------------------------+--------------+----------------------------------------------------+
-| armeabi (ARMv5, ARMv6)       |    >= 2.3    | OpenCV_2.4.8_Manager_2.16_armeabi.apk              |
+| armeabi (ARMv5, ARMv6)       |    >= 2.3    | OpenCV_2.4.9_Manager_2.18_armeabi.apk              |
 +------------------------------+--------------+----------------------------------------------------+
-| Intel x86                    |    >= 2.3    | OpenCV_2.4.8_Manager_2.16_x86.apk                  |
+| Intel x86                    |    >= 2.3    | OpenCV_2.4.9_Manager_2.18_x86.apk                  |
 +------------------------------+--------------+----------------------------------------------------+
-| MIPS                         |    >= 2.3    | OpenCV_2.4.8_Manager_2.16_mips.apk                 |
+| MIPS                         |    >= 2.3    | OpenCV_2.4.9_Manager_2.18_mips.apk                 |
 +------------------------------+--------------+----------------------------------------------------+

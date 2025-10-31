@@ -238,10 +238,12 @@ CV_IMPL CvCapture * cvCreateCameraCapture (int index)
 #endif
 
 #ifdef HAVE_GSTREAMER
-            capture = cvCreateCapture_GStreamer(CV_CAP_GSTREAMER_V4L2, 0);
+            capture = cvCreateCapture_GStreamer(CV_CAP_GSTREAMER_V4L2,
+                                                reinterpret_cast<char *>(index));
             if (capture)
                 return capture;
-            capture = cvCreateCapture_GStreamer(CV_CAP_GSTREAMER_V4L, 0);
+            capture = cvCreateCapture_GStreamer(CV_CAP_GSTREAMER_V4L,
+                                                reinterpret_cast<char *>(index));
             if (capture)
                 return capture;
 #endif
@@ -368,8 +370,10 @@ CV_IMPL CvCapture * cvCreateFileCapture (const char * filename)
 {
     CvCapture * result = 0;
 
+#ifdef HAVE_FFMPEG
     if (! result)
         result = cvCreateFileCapture_FFMPEG_proxy (filename);
+#endif
 
 #ifdef HAVE_VFW
     if (! result)
@@ -426,8 +430,10 @@ CV_IMPL CvVideoWriter* cvCreateVideoWriter( const char* filename, int fourcc,
     if(!fourcc || !fps)
         result = cvCreateVideoWriter_Images(filename);
 
+#ifdef HAVE_FFMPEG
     if(!result)
         result = cvCreateVideoWriter_FFMPEG_proxy (filename, fourcc, fps, frameSize, is_color);
+#endif
 
 #ifdef HAVE_VFW
     if(!result)
@@ -457,6 +463,19 @@ CV_IMPL CvVideoWriter* cvCreateVideoWriter( const char* filename, int fourcc,
 #ifdef HAVE_GSTREAMER
     if (! result)
         result = cvCreateVideoWriter_GStreamer(filename, fourcc, fps, frameSize, is_color);
+#endif
+
+#if !defined(HAVE_FFMPEG) && \
+    !defined(HAVE_VFW) && \
+    !defined(HAVE_MSMF) && \
+    !defined(HAVE_AVFOUNDATION) && \
+    !defined(HAVE_QUICKTIME) && \
+    !defined(HAVE_QTKIT) && \
+    !defined(HAVE_GSTREAMER)
+// If none of the writers is used
+// these statements suppress 'unused parameter' warnings.
+    (void)frameSize;
+    (void)is_color;
 #endif
 
     if(!result)

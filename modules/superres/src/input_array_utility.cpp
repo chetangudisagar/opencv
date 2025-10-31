@@ -207,7 +207,7 @@ namespace
         switch (src.kind())
         {
         case _InputArray::GPU_MAT:
-            #ifdef HAVE_OPENCV_GPU
+            #if defined(HAVE_OPENCV_GPU) && !defined(DYNAMIC_CUDA_SUPPORT)
                 gpu::cvtColor(src.getGpuMat(), dst.getGpuMatRef(), code, cn);
             #else
                 CV_Error(CV_StsNotImplemented, "The called functionality is disabled for current build or platform");
@@ -226,11 +226,11 @@ namespace
 
         static const double maxVals[] =
         {
-            numeric_limits<uchar>::max(),
-            numeric_limits<schar>::max(),
-            numeric_limits<ushort>::max(),
-            numeric_limits<short>::max(),
-            numeric_limits<int>::max(),
+            (double)numeric_limits<uchar>::max(),
+            (double)numeric_limits<schar>::max(),
+            (double)numeric_limits<ushort>::max(),
+            (double)numeric_limits<short>::max(),
+            (double)numeric_limits<int>::max(),
             1.0,
             1.0,
         };
@@ -329,11 +329,11 @@ namespace
 
         static const double maxVals[] =
         {
-            std::numeric_limits<uchar>::max(),
-            std::numeric_limits<schar>::max(),
-            std::numeric_limits<ushort>::max(),
-            std::numeric_limits<short>::max(),
-            std::numeric_limits<int>::max(),
+            (double)std::numeric_limits<uchar>::max(),
+            (double)std::numeric_limits<schar>::max(),
+            (double)std::numeric_limits<ushort>::max(),
+            (double)std::numeric_limits<short>::max(),
+            (double)std::numeric_limits<int>::max(),
             1.0,
             1.0,
         };

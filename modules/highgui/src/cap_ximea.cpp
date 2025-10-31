@@ -1,8 +1,10 @@
 #include "precomp.hpp"
 
+#ifdef WIN32
 #include "xiApi.h"
-#include "xiExt.h"
-#include "m3Api.h"
+#else
+#include <m3api/xiApi.h>
+#endif
 
 /**********************************************************************************/
 
@@ -50,7 +52,15 @@ CvCapture* cvCreateCameraCapture_XIMEA( int index )
 // Enumerate connected devices
 void CvCaptureCAM_XIMEA::init()
 {
+#if defined WIN32 || defined _WIN32
     xiGetNumberDevices( &numDevices);
+#else
+    // try second re-enumeration if first one fails
+    if(xiGetNumberDevices( &numDevices) != XI_OK)
+    {
+        xiGetNumberDevices( &numDevices);
+    }
+#endif
     hmv = NULL;
     frame = NULL;
     timeout = 0;
@@ -71,8 +81,17 @@ bool CvCaptureCAM_XIMEA::open( int wIndex )
 
     if((mvret = xiOpenDevice( wIndex, &hmv)) != XI_OK)
     {
+#if defined WIN32 || defined _WIN32
         errMsg("Open XI_DEVICE failed", mvret);
         return false;
+#else
+        // try opening second time if first fails
+        if((mvret = xiOpenDevice( wIndex, &hmv))  != XI_OK)
+        {
+            errMsg("Open XI_DEVICE failed", mvret);
+            return false;
+        }
+#endif
     }
 
     int width   = 0;
@@ -156,7 +175,7 @@ bool CvCaptureCAM_XIMEA::grabFrame()
     image.size = sizeof(XI_IMG);
     int mvret = xiGetImage( hmv, timeout, &image);
 
-    if(mvret == MM40_ACQUISITION_STOPED)
+    if(mvret == XI_ACQUISITION_STOPED)
     {
         xiStartAcquisition(hmv);
         mvret = xiGetImage(hmv, timeout, &image);

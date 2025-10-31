@@ -897,3 +897,72 @@ TEST(Core_Mat, reshape_1942)
     );
     ASSERT_EQ(1, cn);
 }
+
+TEST(Core_Mat, copyNx1ToVector)
+{
+    cv::Mat_<uchar> src(5, 1);
+    cv::Mat_<uchar> ref_dst8;
+    cv::Mat_<ushort> ref_dst16;
+    std::vector<uchar> dst8;
+    std::vector<ushort> dst16;
+
+    src << 1, 2, 3, 4, 5;
+
+    src.copyTo(ref_dst8);
+    src.copyTo(dst8);
+
+    ASSERT_PRED_FORMAT2(cvtest::MatComparator(0, 0), ref_dst8, cv::Mat_<uchar>(dst8));
+
+    src.convertTo(ref_dst16, CV_16U);
+    src.convertTo(dst16, CV_16U);
+
+    ASSERT_PRED_FORMAT2(cvtest::MatComparator(0, 0), ref_dst16, cv::Mat_<ushort>(dst16));
+}
+
+TEST(Core_InputArray, empty)
+{
+    vector<vector<Point> > data;
+    ASSERT_TRUE(_InputArray(data).empty());
+}
+
+
+TEST(Core_CopyMask, bug1918)
+{
+    Mat_<unsigned char> tmpSrc(100, 100);
+    tmpSrc = 124;
+    Mat_<unsigned char> tmpMask(100, 100);
+    tmpMask = 255;
+    Mat_<unsigned char> tmpDst(100, 100);
+    tmpDst = 2;
+    tmpSrc.copyTo(tmpDst, tmpMask);
+    ASSERT_EQ(sum(tmpDst)[0], 124 * 100 * 100);
+}
+
+TEST(Core_SVD, orthogonality)
+{
+    for (int i = 0; i < 2; i++)
+    {
+        int type = i == 0 ? CV_32F : CV_64F;
+        Mat mat_D(2, 2, type);
+        mat_D.setTo(88.);
+        Mat mat_U, mat_W;
+        SVD::compute(mat_D, mat_W, mat_U, noArray(), SVD::FULL_UV);
+        mat_U *= mat_U.t();
+        ASSERT_LT(norm(mat_U, Mat::eye(2, 2, type), NORM_INF), 1e-5);
+    }
+}
+
+TEST(Core_Mat, multiDim)
+{
+    int d[]={3,3,3};
+    Mat m0 = Mat::zeros(3,d,CV_8U);
+    ASSERT_EQ(0,sum(m0)[0]);
+    Mat m = Mat::ones(3,d,CV_8U);
+    ASSERT_EQ(27,sum(m)[0]);
+    m += 2;
+    ASSERT_EQ(81,sum(m)[0]);
+    m *= 3;
+    ASSERT_EQ(243,sum(m)[0]);
+    m += m;
+    ASSERT_EQ(486,sum(m)[0]);
+}

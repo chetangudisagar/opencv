@@ -111,7 +111,7 @@ Then the PSNR is expressed as:
 
    PSNR = 10 \cdot \log_{10} \left( \frac{MAX_I^2}{MSE} \right)
 
-Here the :math:`MAX_I^2` is the maximum valid value for a pixel. In case of the simple single byte image per pixel per channel this is 255. When two images are the same the MSE will give zero, resulting in an invalid divide by zero operation in the PSNR formula. In this case the PSNR is undefined and as we'll need to handle this case separately. The transition to a logarithmic scale is made because the pixel values have a very wide dynamic range. All this translated to OpenCV and a C++ function looks like:
+Here the :math:`MAX_I` is the maximum valid value for a pixel. In case of the simple single byte image per pixel per channel this is 255. When two images are the same the MSE will give zero, resulting in an invalid divide by zero operation in the PSNR formula. In this case the PSNR is undefined and as we'll need to handle this case separately. The transition to a logarithmic scale is made because the pixel values have a very wide dynamic range. All this translated to OpenCV and a C++ function looks like:
 
 .. code-block:: cpp
 
@@ -212,5 +212,5 @@ You may observe a runtime instance of this on the `YouTube here <https://www.you
 .. raw:: html
 
   <div align="center">
-  <iframe title="Video Input with OpenCV (Plus PSNR and MSSIM)" width="560" height="349" src="http://www.youtube.com/embed/iOcNljutOgg?rel=0&loop=1" frameborder="0" allowfullscreen align="middle"></iframe>
+  <iframe title="Video Input with OpenCV (Plus PSNR and MSSIM)" width="560" height="349" src="https://www.youtube.com/embed/iOcNljutOgg?rel=0&loop=1" frameborder="0" allowfullscreen align="middle"></iframe>
   </div>

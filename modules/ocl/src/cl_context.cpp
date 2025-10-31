@@ -11,7 +11,7 @@
 //                For Open Source Computer Vision Library
 //
 // Copyright (C) 2010-2012, Institute Of Software Chinese Academy Of Science, all rights reserved.
-// Copyright (C) 2010-2012, Advanced Micro Devices, Inc., all rights reserved.
+// Copyright (C) 2010-2014, Advanced Micro Devices, Inc., all rights reserved.
 // Copyright (C) 2010-2012, Multicoreware, Inc., all rights reserved.
 // Third party copyrights are property of their respective owners.
 //
@@ -70,17 +70,6 @@ struct __Module
     cv::Mutex initializationMutex;
     cv::Mutex currentContextMutex;
 };
-static __Module __module;
-
-cv::Mutex& getInitializationMutex()
-{
-    return __module.initializationMutex;
-}
-
-static cv::Mutex& getCurrentContextMutex()
-{
-    return __module.currentContextMutex;
-}
 
 static bool parseOpenCLVersion(const std::string& versionStr, int& major, int& minor)
 {
@@ -178,28 +167,28 @@ struct DeviceInfoImpl: public DeviceInfo
         parseOpenCLVersion(this->deviceVersion,
                 this->deviceVersionMajor, this->deviceVersionMinor);
 
-        size_t maxWorkGroupSize = 0;
-        openCLSafeCall(getScalarInfo(clGetDeviceInfo, device, CL_DEVICE_MAX_WORK_GROUP_SIZE, maxWorkGroupSize));
-        this->maxWorkGroupSize = maxWorkGroupSize;
+        size_t maxWGS = 0;
+        openCLSafeCall(getScalarInfo(clGetDeviceInfo, device, CL_DEVICE_MAX_WORK_GROUP_SIZE, maxWGS));
+        this->maxWorkGroupSize = maxWGS;
 
         cl_uint maxDimensions = 0;
         openCLSafeCall(getScalarInfo(clGetDeviceInfo, device, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS, maxDimensions));
-        std::vector<size_t> maxWorkItemSizes(maxDimensions);
+        std::vector<size_t> maxWIS(maxDimensions);
         openCLSafeCall(clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_ITEM_SIZES, sizeof(size_t) * maxDimensions,
-                (void *)&maxWorkItemSizes[0], 0));
-        this->maxWorkItemSizes = maxWorkItemSizes;
+                (void *)&maxWIS[0], 0));
+        this->maxWorkItemSizes = maxWIS;
 
-        cl_uint maxComputeUnits = 0;
-        openCLSafeCall(getScalarInfo(clGetDeviceInfo, device, CL_DEVICE_MAX_COMPUTE_UNITS, maxComputeUnits));
-        this->maxComputeUnits = maxComputeUnits;
+        cl_uint maxCU = 0;
+        openCLSafeCall(getScalarInfo(clGetDeviceInfo, device, CL_DEVICE_MAX_COMPUTE_UNITS, maxCU));
+        this->maxComputeUnits = maxCU;
 
-        cl_ulong localMemorySize = 0;
-        openCLSafeCall(getScalarInfo(clGetDeviceInfo, device, CL_DEVICE_LOCAL_MEM_SIZE, localMemorySize));
-        this->localMemorySize = (size_t)localMemorySize;
+        cl_ulong localMS = 0;
+        openCLSafeCall(getScalarInfo(clGetDeviceInfo, device, CL_DEVICE_LOCAL_MEM_SIZE, localMS));
+        this->localMemorySize = (size_t)localMS;
 
-        cl_ulong maxMemAllocSize = 0;
-        openCLSafeCall(getScalarInfo(clGetDeviceInfo, device, CL_DEVICE_MAX_MEM_ALLOC_SIZE, maxMemAllocSize));
-        this->maxMemAllocSize = (size_t)maxMemAllocSize;
+        cl_ulong maxMAS = 0;
+        openCLSafeCall(getScalarInfo(clGetDeviceInfo, device, CL_DEVICE_MAX_MEM_ALLOC_SIZE, maxMAS));
+        this->maxMemAllocSize = (size_t)maxMAS;
 
         cl_bool unifiedMemory = false;
         openCLSafeCall(getScalarInfo(clGetDeviceInfo, device, CL_DEVICE_HOST_UNIFIED_MEMORY, unifiedMemory));
@@ -245,6 +234,18 @@ struct DeviceInfoImpl: public DeviceInfo
 
 static std::vector<PlatformInfoImpl> global_platforms;
 static std::vector<DeviceInfoImpl> global_devices;
+static __Module __module;
+
+cv::Mutex& getInitializationMutex()
+{
+    return __module.initializationMutex;
+}
+
+static cv::Mutex& getCurrentContextMutex()
+{
+    return __module.currentContextMutex;
+}
+
 
 static void split(const std::string &s, char delim, std::vector<std::string> &elems) {
     std::stringstream ss(s);
@@ -596,9 +597,16 @@ protected:
         CV_Assert(this != currentContext);
 
 #ifdef CL_VERSION_1_2
-        if (supportsFeature(FEATURE_CL_VER_1_2))
+#ifdef WIN32
+        // if process is on termination stage (ExitProcess was called and other threads were terminated)
+        // then disable device release because it may cause program hang
+        if (!__termination)
+#endif
         {
-            openCLSafeCall(clReleaseDevice(clDeviceID));
+            if (supportsFeature(FEATURE_CL_VER_1_2))
+            {
+                openCLSafeCall(clReleaseDevice(clDeviceID));
+            }
         }
 #endif
         if (deviceInfoImpl._id < 0) // not in the global registry, so we should cleanup it
@@ -617,7 +625,7 @@ protected:
 
 #ifdef WIN32
         // if process is on termination stage (ExitProcess was called and other threads were terminated)
-        // then disable command queue release because it may cause program hang
+        // then disable context release because it may cause program hang
         if (!__termination)
 #endif
         {

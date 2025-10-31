@@ -1252,11 +1252,12 @@ gemm
 ----
 Performs generalized matrix multiplication.
 
-.. ocv:function:: void gemm( InputArray src1, InputArray src2, double alpha, InputArray src3, double gamma, OutputArray dst, int flags=0 )
+.. ocv:function:: void gemm( InputArray src1, InputArray src2, double alpha, InputArray src3, double beta, OutputArray dst, int flags=0 )
 
-.. ocv:pyfunction:: cv2.gemm(src1, src2, alpha, src3, gamma[, dst[, flags]]) -> dst
+.. ocv:pyfunction:: cv2.gemm(src1, src2, alpha, src3, beta[, dst[, flags]]) -> dst
 
 .. ocv:cfunction:: void cvGEMM( const CvArr* src1, const CvArr* src2, double alpha, const CvArr* src3, double beta, CvArr* dst, int tABC=0)
+
 .. ocv:pyoldfunction:: cv.GEMM(src1, src2, alpha, src3, beta, dst, tABC=0)-> None
 
     :param src1: first multiplied input matrix that should have ``CV_32FC1``, ``CV_64FC1``, ``CV_32FC2``, or ``CV_64FC2`` type.
@@ -1996,7 +1997,7 @@ Performs the per-element multiplication of two Fourier spectrums.
 
     :param dst: output array of the same size and type as ``src1`` .
 
-    :param flags: operation flags; currently, the only supported flag is ``DFT_ROWS``, which indicates that each row of ``src1`` and ``src2`` is an independent 1D Fourier spectrum.
+    :param flags: operation flags; currently, the only supported flag is ``DFT_ROWS``, which indicates that each row of ``src1`` and ``src2`` is an independent 1D Fourier spectrum. If you do not want to use this flag, then simply add a `0` as value.
 
     :param conjB: optional flag that conjugates the second input array before the multiplication (true) or not (false).
 
@@ -2506,7 +2507,7 @@ The function ``pow`` raises every element of the input array to ``power`` :
 
 .. math::
 
-    \texttt{dst} (I) =  \fork{\texttt{src}(I)^power}{if \texttt{power} is integer}{|\texttt{src}(I)|^power}{otherwise}
+    \texttt{dst} (I) =  \fork{\texttt{src}(I)^{power}}{if \texttt{power} is integer}{|\texttt{src}(I)|^{power}}{otherwise}
 
 So, for a non-integer power exponent, the absolute values of input array elements are used. However, it is possible to get true values for negative values using some extra operations. In the example below, computing the 5th root of array ``src``  shows: ::
 

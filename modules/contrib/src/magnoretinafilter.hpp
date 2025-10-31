@@ -195,8 +195,8 @@ namespace cv
 #ifdef MAKE_PARALLEL
         /******************************************************
         ** IF some parallelizing thread methods are available, then, main loops are parallelized using these functors
-        ** ==> main idea paralellise main filters loops, then, only the most used methods are parallelized... TODO : increase the number of parallelised methods as necessary
-        ** ==> functors names = Parallel_$$$ where $$$= the name of the serial method that is parallelised
+        ** ==> main idea parallelize main filters loops, then, only the most used methods are parallelized... TODO : increase the number of parallelized methods as necessary
+        ** ==> functors names = Parallel_$$$ where $$$= the name of the serial method that is parallelized
         ** ==> functors constructors can differ from the parameters used with their related serial functions
         */
         class Parallel_amacrineCellsComputing: public cv::ParallelLoopBody
@@ -210,12 +210,12 @@ namespace cv
                 :OPL_ON(OPL_ON_PTR), OPL_OFF(OPL_OFF_PTR), previousInput_ON(previousInput_ON_PTR), previousInput_OFF(previousInput_OFF_PTR), amacrinCellsTempOutput_ON(amacrinCellsTempOutput_ON_PTR), amacrinCellsTempOutput_OFF(amacrinCellsTempOutput_OFF_PTR), temporalCoefficient(temporalCoefficientVal) {}
 
             virtual void operator()( const Range& r ) const {
-                register const float *OPL_ON_PTR=OPL_ON+r.start;
-                register const float *OPL_OFF_PTR=OPL_OFF+r.start;
-                register float *previousInput_ON_PTR= previousInput_ON+r.start;
-                register float *previousInput_OFF_PTR= previousInput_OFF+r.start;
-                register float *amacrinCellsTempOutput_ON_PTR= amacrinCellsTempOutput_ON+r.start;
-                register float *amacrinCellsTempOutput_OFF_PTR= amacrinCellsTempOutput_OFF+r.start;
+                const float *OPL_ON_PTR=OPL_ON+r.start;
+                const float *OPL_OFF_PTR=OPL_OFF+r.start;
+                float *previousInput_ON_PTR= previousInput_ON+r.start;
+                float *previousInput_OFF_PTR= previousInput_OFF+r.start;
+                float *amacrinCellsTempOutput_ON_PTR= amacrinCellsTempOutput_ON+r.start;
+                float *amacrinCellsTempOutput_OFF_PTR= amacrinCellsTempOutput_OFF+r.start;
 
                 for (int IDpixel=r.start ; IDpixel!=r.end; ++IDpixel)
                 {

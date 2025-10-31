@@ -690,20 +690,20 @@ static void GPUFilter2D(const oclMat &src, oclMat &dst, const Mat &kernel,
         size_t lt[3] = {BLOCK_SIZE, 1, 1};
         size_t gt[3] = {divUp(dst.cols, BLOCK_SIZE - (ksize.width - 1)) * BLOCK_SIZE, divUp(dst.rows, BLOCK_SIZE_Y), 1};
 
-        cl_kernel kernel = openCLGetKernelFromSource(src.clCxt, &filtering_filter2D, "filter2D", -1, -1, build_options);
+        cl_kernel localKernel = openCLGetKernelFromSource(src.clCxt, &filtering_filter2D, "filter2D", -1, -1, build_options);
 
         size_t kernelWorkGroupSize;
-        openCLSafeCall(clGetKernelWorkGroupInfo(kernel, getClDeviceID(src.clCxt),
+        openCLSafeCall(clGetKernelWorkGroupInfo(localKernel, getClDeviceID(src.clCxt),
                                                 CL_KERNEL_WORK_GROUP_SIZE, sizeof(size_t), &kernelWorkGroupSize, 0));
         if (lt[0] > kernelWorkGroupSize)
         {
-            clReleaseKernel(kernel);
+            clReleaseKernel(localKernel);
             CV_Assert(BLOCK_SIZE > kernelWorkGroupSize);
             tryWorkItems = kernelWorkGroupSize;
             continue;
         }
 
-        openCLExecuteKernel(src.clCxt, kernel, gt, lt, args); // kernel will be released here
+        openCLExecuteKernel(src.clCxt, localKernel, gt, lt, args); // kernel will be released here
     } while (false);
 }
 
@@ -774,12 +774,12 @@ static void sepFilter2D_SinglePass(const oclMat &src, oclMat &dst,
 
     option += " -D KERNEL_MATRIX_X=";
     for(int i=0; i<row_kernel.rows; i++)
-        option += cv::format("0x%x,", *reinterpret_cast<const unsigned int*>( &row_kernel.at<float>(i) ) );
+        option += cv::format("DIG(0x%x)", *reinterpret_cast<const unsigned int*>( &row_kernel.at<float>(i) ) );
     option += "0x0";
 
     option += " -D KERNEL_MATRIX_Y=";
     for(int i=0; i<col_kernel.rows; i++)
-        option += cv::format("0x%x,", *reinterpret_cast<const unsigned int*>( &col_kernel.at<float>(i) ) );
+        option += cv::format("DIG(0x%x)", *reinterpret_cast<const unsigned int*>( &col_kernel.at<float>(i) ) );
     option += "0x0";
 
     switch(src.type())
@@ -1170,7 +1170,7 @@ void linearRowFilter_gpu(const oclMat &src, const oclMat &dst, oclMat mat_kernel
 #else
     size_t localThreads[3] = { 16, 16, 1 };
 #endif
-    size_t globalThreads[3] = { dst.cols, dst.rows, 1 };
+    size_t globalThreads[3] = { (size_t)dst.cols, (size_t)dst.rows, 1 };
 
     const char * const borderMap[] = { "BORDER_CONSTANT", "BORDER_REPLICATE", "BORDER_REFLECT", "BORDER_WRAP", "BORDER_REFLECT_101" };
     std::string buildOptions = format("-D RADIUSX=%d -D LSIZE0=%d -D LSIZE1=%d -D CN=%d -D %s",
@@ -1410,7 +1410,7 @@ Ptr<FilterEngine_GPU> cv::ocl::createSeparableLinearFilter_GPU(int srcType, int 
     //if image size is non-degenerate and large enough
     //and if filter support is reasonable to satisfy larger local memory requirements,
     //then we can use single pass routine to avoid extra runtime calls overhead
-    if( clCxt && clCxt->supportsFeature(FEATURE_CL_INTEL_DEVICE) &&
+    if( clCxt &&
         rowKernel.rows <= 21 && columnKernel.rows <= 21 &&
         (rowKernel.rows & 1) == 1 && (columnKernel.rows & 1) == 1 &&
         imgSize.width > optimizedSepFilterLocalSize + (rowKernel.rows>>1) &&

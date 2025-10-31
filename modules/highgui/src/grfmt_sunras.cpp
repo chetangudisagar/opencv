@@ -120,7 +120,7 @@ bool  SunRasterDecoder::readHeader()
                     m_type = IsColorPalette( m_palette, m_bpp ) ? CV_8UC3 : CV_8UC1;
                     m_offset = m_strm.getPos();
 
-                    assert( m_offset == 32 + m_maplength );
+                    CV_Assert(m_offset == 32 + m_maplength);
                     result = true;
                 }
             }
@@ -133,7 +133,7 @@ bool  SunRasterDecoder::readHeader()
 
                 m_offset = m_strm.getPos();
 
-                assert( m_offset == 32 + m_maplength );
+                CV_Assert(m_offset == 32 + m_maplength);
                 result = true;
             }
         }
@@ -156,7 +156,7 @@ bool  SunRasterDecoder::readData( Mat& img )
 {
     int color = img.channels() > 1;
     uchar* data = img.data;
-    int step = (int)img.step;
+    size_t step = img.step;
     uchar  gray_palette[256];
     bool   result = false;
     int  src_pitch = ((m_width*m_bpp + 7)/8 + 1) & -2;
@@ -226,7 +226,7 @@ bool  SunRasterDecoder::readData( Mat& img )
                         code = m_strm.getByte();
                         if( len > line_end - tsrc )
                         {
-                            assert(0);
+                            CV_Error(CV_StsInternal, "");
                             goto bad_decoding_1bpp;
                         }
 
@@ -304,11 +304,11 @@ bad_decoding_1bpp:
                         code = m_strm.getByte();
 
                         if( color )
-                            data = FillUniColor( data, line_end, step, width3,
+                            data = FillUniColor( data, line_end, validateToInt(step), width3,
                                                  y, m_height, len,
                                                  m_palette[code] );
                         else
-                            data = FillUniGray( data, line_end, step, width3,
+                            data = FillUniGray( data, line_end, validateToInt(step), width3,
                                                 y, m_height, len,
                                                 gray_palette[code] );
                         if( y >= m_height )
@@ -367,7 +367,7 @@ bad_decoding_end:
             result = true;
             break;
         default:
-            assert(0);
+            CV_Error(CV_StsInternal, "");
         }
     }
     catch( ... )

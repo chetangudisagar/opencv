@@ -2048,7 +2048,7 @@ GPU_TEST_P(CvtColor, Luv2LRGBA)
     EXPECT_MAT_NEAR(dst_gold, dst, depth == CV_8U ? 1 : 1e-4);
 }
 
-#if defined (CUDA_VERSION) && (CUDA_VERSION >= 5000)
+#if defined (CUDART_VERSION) && (CUDART_VERSION >= 5000)
 
 GPU_TEST_P(CvtColor, RGBA2mRGBA)
 {
@@ -2066,7 +2066,7 @@ GPU_TEST_P(CvtColor, RGBA2mRGBA)
     EXPECT_MAT_NEAR(dst_gold, dst, 1);
 }
 
-#endif // defined (CUDA_VERSION) && (CUDA_VERSION >= 5000)
+#endif // defined (CUDART_VERSION) && (CUDART_VERSION >= 5000)
 
 GPU_TEST_P(CvtColor, BayerBG2BGR)
 {
@@ -2285,11 +2285,19 @@ GPU_TEST_P(CvtColor, BayerGR2Gray)
     EXPECT_MAT_NEAR(dst_gold(cv::Rect(1, 1, dst.cols - 2, dst.rows - 2)), dst(cv::Rect(1, 1, dst.cols - 2, dst.rows - 2)), 2);
 }
 
+#ifdef OPENCV_TINY_GPU_MODULE
+INSTANTIATE_TEST_CASE_P(GPU_ImgProc, CvtColor, testing::Combine(
+    ALL_DEVICES,
+    DIFFERENT_SIZES,
+    testing::Values(MatDepth(CV_8U), MatDepth(CV_32F)),
+    WHOLE_SUBMAT));
+#else
 INSTANTIATE_TEST_CASE_P(GPU_ImgProc, CvtColor, testing::Combine(
     ALL_DEVICES,
     DIFFERENT_SIZES,
     testing::Values(MatDepth(CV_8U), MatDepth(CV_16U), MatDepth(CV_32F)),
     WHOLE_SUBMAT));
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 // Demosaicing

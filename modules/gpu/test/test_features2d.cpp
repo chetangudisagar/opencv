@@ -52,20 +52,20 @@ using namespace cvtest;
 namespace
 {
     IMPLEMENT_PARAM_CLASS(FAST_Threshold, int)
-    IMPLEMENT_PARAM_CLASS(FAST_NonmaxSupression, bool)
+    IMPLEMENT_PARAM_CLASS(FAST_NonmaxSuppression, bool)
 }
 
-PARAM_TEST_CASE(FAST, cv::gpu::DeviceInfo, FAST_Threshold, FAST_NonmaxSupression)
+PARAM_TEST_CASE(FAST, cv::gpu::DeviceInfo, FAST_Threshold, FAST_NonmaxSuppression)
 {
     cv::gpu::DeviceInfo devInfo;
     int threshold;
-    bool nonmaxSupression;
+    bool nonmaxSuppression;
 
     virtual void SetUp()
     {
         devInfo = GET_PARAM(0);
         threshold = GET_PARAM(1);
-        nonmaxSupression = GET_PARAM(2);
+        nonmaxSuppression = GET_PARAM(2);
 
         cv::gpu::setDevice(devInfo.deviceID());
     }
@@ -77,7 +77,7 @@ GPU_TEST_P(FAST, Accuracy)
     ASSERT_FALSE(image.empty());
 
     cv::gpu::FAST_GPU fast(threshold);
-    fast.nonmaxSupression = nonmaxSupression;
+    fast.nonmaxSuppression = nonmaxSuppression;
 
     if (!supportFeature(devInfo, cv::gpu::GLOBAL_ATOMICS))
     {
@@ -97,7 +97,7 @@ GPU_TEST_P(FAST, Accuracy)
         fast(loadMat(image), cv::gpu::GpuMat(), keypoints);
 
         std::vector<cv::KeyPoint> keypoints_gold;
-        cv::FAST(image, keypoints_gold, threshold, nonmaxSupression);
+        cv::FAST(image, keypoints_gold, threshold, nonmaxSuppression);
 
         ASSERT_KEYPOINTS_EQ(keypoints_gold, keypoints);
     }
@@ -106,7 +106,7 @@ GPU_TEST_P(FAST, Accuracy)
 INSTANTIATE_TEST_CASE_P(GPU_Features2D, FAST, testing::Combine(
     ALL_DEVICES,
     testing::Values(FAST_Threshold(25), FAST_Threshold(50)),
-    testing::Values(FAST_NonmaxSupression(false), FAST_NonmaxSupression(true))));
+    testing::Values(FAST_NonmaxSuppression(false), FAST_NonmaxSuppression(true))));
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // ORB
@@ -310,6 +310,7 @@ GPU_TEST_P(BruteForceMatcher, Match_Single)
     ASSERT_EQ(0, badCount);
 }
 
+#ifndef OPENCV_TINY_GPU_MODULE
 GPU_TEST_P(BruteForceMatcher, Match_Collection)
 {
     cv::gpu::BFMatcher_GPU matcher(normCode);
@@ -363,6 +364,7 @@ GPU_TEST_P(BruteForceMatcher, Match_Collection)
 
     ASSERT_EQ(0, badCount);
 }
+#endif
 
 GPU_TEST_P(BruteForceMatcher, KnnMatch_2_Single)
 {
@@ -442,6 +444,7 @@ GPU_TEST_P(BruteForceMatcher, KnnMatch_3_Single)
     ASSERT_EQ(0, badCount);
 }
 
+#ifndef OPENCV_TINY_GPU_MODULE
 GPU_TEST_P(BruteForceMatcher, KnnMatch_2_Collection)
 {
     cv::gpu::BFMatcher_GPU matcher(normCode);
@@ -565,6 +568,7 @@ GPU_TEST_P(BruteForceMatcher, KnnMatch_3_Collection)
 
     ASSERT_EQ(0, badCount);
 }
+#endif
 
 GPU_TEST_P(BruteForceMatcher, RadiusMatch_Single)
 {
@@ -615,6 +619,7 @@ GPU_TEST_P(BruteForceMatcher, RadiusMatch_Single)
     }
 }
 
+#ifndef OPENCV_TINY_GPU_MODULE
 GPU_TEST_P(BruteForceMatcher, RadiusMatch_Collection)
 {
     cv::gpu::BFMatcher_GPU matcher(normCode);
@@ -693,11 +698,20 @@ GPU_TEST_P(BruteForceMatcher, RadiusMatch_Collection)
         ASSERT_EQ(0, badCount);
     }
 }
+#endif
 
+#ifdef OPENCV_TINY_GPU_MODULE
+INSTANTIATE_TEST_CASE_P(GPU_Features2D, BruteForceMatcher, testing::Combine(
+    ALL_DEVICES,
+    testing::Values(NormCode(cv::NORM_L2)),
+    testing::Values(DescriptorSize(57), DescriptorSize(64), DescriptorSize(83), DescriptorSize(128), DescriptorSize(179), DescriptorSize(256), DescriptorSize(304)),
+    testing::Values(UseMask(false), UseMask(true))));
+#else
 INSTANTIATE_TEST_CASE_P(GPU_Features2D, BruteForceMatcher, testing::Combine(
     ALL_DEVICES,
     testing::Values(NormCode(cv::NORM_L1), NormCode(cv::NORM_L2)),
     testing::Values(DescriptorSize(57), DescriptorSize(64), DescriptorSize(83), DescriptorSize(128), DescriptorSize(179), DescriptorSize(256), DescriptorSize(304)),
     testing::Values(UseMask(false), UseMask(true))));
+#endif
 
 #endif // HAVE_CUDA

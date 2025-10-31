@@ -127,44 +127,46 @@ template<typename T> struct OpMax
     T operator ()(const T a, const T b) const { return std::max(a, b); }
 };
 
-inline Size getContinuousSize( const Mat& m1, int widthScale=1 )
+inline Size getContinuousSize_(int flags, int cols, int rows, int widthScale)
 {
-    CV_Assert(m1.dims <= 2);
-    return m1.isContinuous() ? Size(m1.cols*m1.rows*widthScale, 1) :
-        Size(m1.cols*widthScale, m1.rows);
+    int64 sz = (int64)cols * rows * widthScale;
+    return (flags & Mat::CONTINUOUS_FLAG) != 0 &&
+        (int)sz == sz ? Size((int)sz, 1) : Size(cols * widthScale, rows);
 }
 
-inline Size getContinuousSize( const Mat& m1, const Mat& m2, int widthScale=1 )
+inline Size getContinuousSize(const Mat& m1, int widthScale = 1)
 {
-    CV_Assert(m1.dims <= 2 && m1.size() == m2.size());
-    return (m1.flags & m2.flags & Mat::CONTINUOUS_FLAG) != 0 ?
-        Size(m1.cols*m1.rows*widthScale, 1) : Size(m1.cols*widthScale, m1.rows);
+    return getContinuousSize_(m1.flags,
+                              m1.cols, m1.rows, widthScale);
 }
 
-inline Size getContinuousSize( const Mat& m1, const Mat& m2,
-                               const Mat& m3, int widthScale=1 )
+inline Size getContinuousSize(const Mat& m1, const Mat& m2, int widthScale = 1)
 {
-    CV_Assert(m1.dims <= 2 && m1.size() == m2.size() && m1.size() == m3.size());
-    return (m1.flags & m2.flags & m3.flags & Mat::CONTINUOUS_FLAG) != 0 ?
-        Size(m1.cols*m1.rows*widthScale, 1) : Size(m1.cols*widthScale, m1.rows);
+    return getContinuousSize_(m1.flags & m2.flags,
+                              m1.cols, m1.rows, widthScale);
 }
 
-inline Size getContinuousSize( const Mat& m1, const Mat& m2,
-                               const Mat& m3, const Mat& m4,
-                               int widthScale=1 )
+inline Size getContinuousSize(const Mat& m1, const Mat& m2,
+                              const Mat& m3, int widthScale = 1)
 {
-    CV_Assert(m1.dims <= 2 && m1.size() == m2.size() && m1.size() == m3.size() && m1.size() == m4.size());
-    return (m1.flags & m2.flags & m3.flags & m4.flags & Mat::CONTINUOUS_FLAG) != 0 ?
-        Size(m1.cols*m1.rows*widthScale, 1) : Size(m1.cols*widthScale, m1.rows);
+    return getContinuousSize_(m1.flags & m2.flags & m3.flags,
+                              m1.cols, m1.rows, widthScale);
 }
 
-inline Size getContinuousSize( const Mat& m1, const Mat& m2,
-                               const Mat& m3, const Mat& m4,
-                               const Mat& m5, int widthScale=1 )
+inline Size getContinuousSize(const Mat& m1, const Mat& m2,
+                              const Mat& m3, const Mat& m4,
+                              int widthScale = 1)
 {
-    CV_Assert(m1.dims <= 2 && m1.size() == m2.size() && m1.size() == m3.size() && m1.size() == m4.size() && m1.size() == m5.size());
-    return (m1.flags & m2.flags & m3.flags & m4.flags & m5.flags & Mat::CONTINUOUS_FLAG) != 0 ?
-        Size(m1.cols*m1.rows*widthScale, 1) : Size(m1.cols*widthScale, m1.rows);
+    return getContinuousSize_(m1.flags & m2.flags & m3.flags & m4.flags,
+                              m1.cols, m1.rows, widthScale);
+}
+
+inline Size getContinuousSize(const Mat& m1, const Mat& m2,
+                              const Mat& m3, const Mat& m4,
+                              const Mat& m5, int widthScale = 1)
+{
+    return getContinuousSize_(m1.flags & m2.flags & m3.flags & m4.flags & m5.flags,
+                              m1.cols, m1.rows, widthScale);
 }
 
 struct NoVec
