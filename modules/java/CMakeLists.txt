@@ -247,7 +247,7 @@ if(ANDROID)
     # build the library project
     # normally we should do this after a native part, but for a library project we can build the java part first
     add_custom_command(OUTPUT "${JAR_FILE}" "${JAR_FILE}.dephelper"
-                       COMMAND ${ANT_EXECUTABLE} -q -noinput -k debug
+                       COMMAND ${ANT_EXECUTABLE} -q -noinput -k debug -Djava.target=1.6 -Djava.source=1.6
                        COMMAND ${CMAKE_COMMAND} -E touch "${JAR_FILE}.dephelper" # can not rely on classes.jar because different versions of SDK update timestamp at different times
                        WORKING_DIRECTORY "${OpenCV_BINARY_DIR}"
                        DEPENDS ${step3_depends}
@@ -286,6 +286,9 @@ else(ANDROID)
 endif(ANDROID)
 
 # step 5: build native part
+ocv_warnings_disable(CMAKE_CXX_FLAGS -Wunused-const-variable -Woverloaded-virtual)
+
+
 add_library(${the_module} SHARED ${handwrittren_h_sources} ${handwrittren_cpp_sources} ${generated_cpp_sources}
                                  ${copied_files}
                                 "${JAR_FILE}" "${JAR_FILE}.dephelper")
@@ -311,25 +314,26 @@ if(BUILD_FAT_JAVA_LIB)
   endif()
   if(APPLE)
     foreach(_dep ${__deps})
-      target_link_libraries(${the_module} -Wl,-force_load "${_dep}")
+      target_link_libraries(${the_module} LINK_PRIVATE -Wl,-force_load "${_dep}")
     endforeach()
   else()
-    target_link_libraries(${the_module} -Wl,-whole-archive ${__deps} -Wl,-no-whole-archive)
+    target_link_libraries(${the_module} LINK_PRIVATE -Wl,-whole-archive ${__deps} -Wl,-no-whole-archive)
   endif()
-  target_link_libraries(${the_module} ${__extradeps} ${OPENCV_LINKER_LIBS})
+  target_link_libraries(${the_module} LINK_PRIVATE ${__extradeps} ${OPENCV_LINKER_LIBS})
 else()
-  target_link_libraries(${the_module} ${OPENCV_MODULE_${the_module}_DEPS} ${OPENCV_LINKER_LIBS})
+  target_link_libraries(${the_module} LINK_PRIVATE ${OPENCV_MODULE_${the_module}_DEPS} ${OPENCV_LINKER_LIBS})
 endif()
 
 if(ANDROID)
-  target_link_libraries(${the_module} jnigraphics) # for Mat <=> Bitmap converters
+  target_link_libraries(${the_module} LINK_PUBLIC jnigraphics) # for Mat <=> Bitmap converters
+  target_link_libraries(${the_module} LINK_PUBLIC log dl z)
+  target_link_libraries(${the_module} LINK_PRIVATE ${OPENCV_LINKER_LIBS})
 
   # force strip library after the build command
   # because samples and tests will make a copy of the library before install
-  get_target_property(__opencv_java_location ${the_module} LOCATION)
   # Turn off stripping in debug build
   if ( NOT (CMAKE_BUILD_TYPE MATCHES "Debug"))
-    add_custom_command(TARGET ${the_module} POST_BUILD COMMAND ${CMAKE_STRIP} --strip-unneeded "${__opencv_java_location}")
+    add_custom_command(TARGET ${the_module} POST_BUILD COMMAND ${CMAKE_STRIP} --strip-unneeded "$<TARGET_FILE:${the_module}>")
   endif()
 endif()
 
@@ -339,8 +343,6 @@ set_target_properties(${the_module} PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY ${LIBRARY_OUTPUT_PATH}
     LIBRARY_OUTPUT_DIRECTORY ${LIBRARY_OUTPUT_PATH}
     RUNTIME_OUTPUT_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}
-    INSTALL_NAME_DIR ${OPENCV_LIB_INSTALL_PATH}
-    LINK_INTERFACE_LIBRARIES ""
     )
 
 if(WIN32)

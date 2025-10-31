@@ -14,12 +14,7 @@
 
 IF(CMAKE_COMPILER_IS_GNUCXX)
 
-    EXEC_PROGRAM(
-        ${CMAKE_CXX_COMPILER}
-        ARGS ${CMAKE_CXX_COMPILER_ARG1} -dumpversion
-        OUTPUT_VARIABLE gcc_compiler_version)
-    #MESSAGE("GCC Version: ${gcc_compiler_version}")
-    IF(gcc_compiler_version VERSION_GREATER "4.2.-1")
+    IF(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.2.0")
         SET(PCHSupport_FOUND TRUE)
     ENDIF()
 
@@ -51,20 +46,49 @@ MACRO(_PCH_GET_COMPILE_FLAGS _out_compile_flags)
       ENDIF()
     endif()
 
+    IF(CMAKE_COMPILER_IS_GNUCXX)
+
+        GET_PROPERTY(_definitions DIRECTORY PROPERTY COMPILE_DEFINITIONS)
+        if(_definitions)
+          foreach(_def ${_definitions})
+            LIST(APPEND ${_out_compile_flags} "\"-D${_def}\"")
+          endforeach()
+        endif()
+        GET_TARGET_PROPERTY(_target_definitions ${_PCH_current_target} COMPILE_DEFINITIONS)
+        if(_target_definitions)
+          foreach(_def ${_target_definitions})
+            LIST(APPEND ${_out_compile_flags} "\"-D${_def}\"")
+          endforeach()
+        endif()
+
+    ELSE()
+        ## TODO ... ? or does it work out of the box
+    ENDIF()
+
     GET_DIRECTORY_PROPERTY(DIRINC INCLUDE_DIRECTORIES )
     FOREACH(item ${DIRINC})
         if(item MATCHES "^${OpenCV_SOURCE_DIR}/modules/")
           LIST(APPEND ${_out_compile_flags} "${_PCH_include_prefix}\"${item}\"")
+        elseif(CMAKE_COMPILER_IS_GNUCXX AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "6.0" AND
+               item MATCHES "/usr/include$")
+          # workaround for GCC 6.x bug
         else()
           LIST(APPEND ${_out_compile_flags} "${_PCH_isystem_prefix}\"${item}\"")
         endif()
     ENDFOREACH(item)
 
-    GET_DIRECTORY_PROPERTY(_directory_flags DEFINITIONS)
-    GET_DIRECTORY_PROPERTY(_global_definitions DIRECTORY ${OpenCV_SOURCE_DIR} DEFINITIONS)
-    #MESSAGE("_directory_flags ${_directory_flags} ${_global_definitions}" )
-    LIST(APPEND ${_out_compile_flags} ${_directory_flags})
-    LIST(APPEND ${_out_compile_flags} ${_global_definitions})
+    get_target_property(DIRINC ${_PCH_current_target} INCLUDE_DIRECTORIES )
+    FOREACH(item ${DIRINC})
+        if(item MATCHES "^${OpenCV_SOURCE_DIR}/modules/")
+          LIST(APPEND ${_out_compile_flags} "${_PCH_include_prefix}\"${item}\"")
+        elseif(CMAKE_COMPILER_IS_GNUCXX AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "6.0" AND
+               item MATCHES "/usr/include$")
+          # workaround for GCC 6.x bug
+        else()
+          LIST(APPEND ${_out_compile_flags} "${_PCH_isystem_prefix}\"${item}\"")
+        endif()
+    ENDFOREACH(item)
+
     LIST(APPEND ${_out_compile_flags} ${CMAKE_CXX_FLAGS})
 
     SEPARATE_ARGUMENTS(${_out_compile_flags})
@@ -146,9 +170,9 @@ MACRO(_PCH_GET_TARGET_COMPILE_FLAGS _cflags  _header_name _pch_path _dowarn )
         # if you have different versions of the headers for different build types
         # you may set _pch_dowarn
         IF (_dowarn)
-            set(${_cflags} "${PCH_ADDITIONAL_COMPILER_FLAGS} -Winvalid-pch")
+            SET(${_cflags} "${PCH_ADDITIONAL_COMPILER_FLAGS} -Winvalid-pch " )
         ELSE (_dowarn)
-            set(${_cflags} "${PCH_ADDITIONAL_COMPILER_FLAGS}")
+            SET(${_cflags} "${PCH_ADDITIONAL_COMPILER_FLAGS} " )
         ENDIF (_dowarn)
 
     ELSE(CMAKE_COMPILER_IS_GNUCXX)
@@ -246,12 +270,15 @@ MACRO(ADD_PRECOMPILED_HEADER _targetName _input)
         endif()
     endif()
 
+    get_target_property(DIRINC ${_targetName} INCLUDE_DIRECTORIES)
+    set_target_properties(${_targetName}_pch_dephelp PROPERTIES INCLUDE_DIRECTORIES "${DIRINC}")
+
     #MESSAGE("_compile_FLAGS: ${_compile_FLAGS}")
     #message("COMMAND ${CMAKE_CXX_COMPILER}	${_compile_FLAGS} -x c++-header -o ${_output} ${_input}")
 
     ADD_CUSTOM_COMMAND(
       OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${_name}"
-      COMMAND ${CMAKE_COMMAND} -E copy  "${_input}" "${CMAKE_CURRENT_BINARY_DIR}/${_name}" # ensure same directory! Required by gcc
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_input}" "${CMAKE_CURRENT_BINARY_DIR}/${_name}" # ensure same directory! Required by gcc
       DEPENDS "${_input}"
       )
 

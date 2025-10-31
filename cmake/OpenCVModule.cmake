@@ -49,6 +49,8 @@ foreach(mod ${OPENCV_MODULES_BUILD} ${OPENCV_MODULES_DISABLED_USER} ${OPENCV_MOD
   if(HAVE_${mod})
     unset(HAVE_${mod} CACHE)
   endif()
+  unset(OPENCV_MODULE_${mod}_DEPS CACHE)
+  unset(OPENCV_MODULE_${mod}_DEPS_EXT CACHE)
   unset(OPENCV_MODULE_${mod}_REQ_DEPS CACHE)
   unset(OPENCV_MODULE_${mod}_OPT_DEPS CACHE)
   unset(OPENCV_MODULE_${mod}_PRIVATE_REQ_DEPS CACHE)
@@ -168,6 +170,10 @@ macro(ocv_add_module _name)
       return() # extra protection from redefinition
     endif()
     project(${the_module})
+    add_definitions(
+        -D_USE_MATH_DEFINES  # M_PI constant in MSVS
+        -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -D__STDC_FORMAT_MACROS  # to use C libraries from C++ code (ffmpeg)
+    )
   endif(OPENCV_INITIAL_PASS)
 endmacro()
 
@@ -488,7 +494,7 @@ macro(ocv_glob_module_sources)
 
   file(GLOB_RECURSE lib_srcs "src/*.cpp")
   file(GLOB_RECURSE lib_int_hdrs "src/*.hpp" "src/*.h")
-  file(GLOB lib_hdrs "include/opencv2/${name}/*.hpp" "include/opencv2/${name}/*.h")
+  file(GLOB lib_hdrs "include/opencv2/*.hpp" "include/opencv2/${name}/*.hpp" "include/opencv2/${name}/*.h")
   file(GLOB lib_hdrs_detail "include/opencv2/${name}/detail/*.hpp" "include/opencv2/${name}/detail/*.h")
   file(GLOB_RECURSE lib_srcs_apple "src/*.mm")
   if (APPLE)
@@ -572,9 +578,12 @@ macro(ocv_create_module)
     ${${the_module}_pch})
 
   if(NOT "${ARGN}" STREQUAL "SKIP_LINK")
-    target_link_libraries(${the_module} ${OPENCV_MODULE_${the_module}_DEPS})
-    target_link_libraries(${the_module} LINK_INTERFACE_LIBRARIES ${OPENCV_MODULE_${the_module}_DEPS})
-    target_link_libraries(${the_module} ${OPENCV_MODULE_${the_module}_DEPS_EXT} ${OPENCV_LINKER_LIBS} ${IPP_LIBS} ${ARGN})
+    target_link_libraries(${the_module} LINK_PUBLIC ${OPENCV_MODULE_${the_module}_DEPS})
+    target_link_libraries(${the_module} LINK_PUBLIC ${OPENCV_MODULE_${the_module}_DEPS})
+    set(extra_deps ${OPENCV_MODULE_${the_module}_DEPS_EXT} ${OPENCV_LINKER_LIBS} ${IPP_LIBS} ${ARGN})
+    ocv_extract_simple_libs(extra_deps _simple_deps _other_deps)
+    target_link_libraries(${the_module} LINK_PRIVATE ${_simple_deps}) # this list goes to "export"
+    target_link_libraries(${the_module} LINK_PRIVATE ${extra_deps})
   endif()
 
   add_dependencies(opencv_modules ${the_module})
@@ -586,10 +595,12 @@ macro(ocv_create_module)
   set_target_properties(${the_module} PROPERTIES
     OUTPUT_NAME "${the_module}${OPENCV_DLLVERSION}"
     DEBUG_POSTFIX "${OPENCV_DEBUG_POSTFIX}"
+    COMPILE_PDB_NAME "${the_module}${OPENCV_DLLVERSION}"
+    COMPILE_PDB_NAME_DEBUG "${the_module}${OPENCV_DLLVERSION}${OPENCV_DEBUG_POSTFIX}"
     ARCHIVE_OUTPUT_DIRECTORY ${LIBRARY_OUTPUT_PATH}
+    COMPILE_PDB_OUTPUT_DIRECTORY ${LIBRARY_OUTPUT_PATH}
     LIBRARY_OUTPUT_DIRECTORY ${LIBRARY_OUTPUT_PATH}
     RUNTIME_OUTPUT_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}
-    INSTALL_NAME_DIR lib
   )
 
   # For dynamic link numbering convenions
@@ -629,7 +640,7 @@ macro(ocv_create_module)
   if(OPENCV_MODULE_${the_module}_HEADERS AND ";${OPENCV_MODULES_PUBLIC};" MATCHES ";${the_module};")
     foreach(hdr ${OPENCV_MODULE_${the_module}_HEADERS})
       string(REGEX REPLACE "^.*opencv2/" "opencv2/" hdr2 "${hdr}")
-      if(hdr2 MATCHES "^(opencv2/.*)/[^/]+.h(..)?$")
+      if(hdr2 MATCHES "^(opencv2/?.*)/[^/]+.h(..)?$")
         install(FILES ${hdr} DESTINATION "${OPENCV_INCLUDE_INSTALL_PATH}/${CMAKE_MATCH_1}" COMPONENT dev)
       endif()
     endforeach()
@@ -893,7 +904,7 @@ function(ocv_add_samples)
     file(GLOB sample_files "${samples_path}/*")
     install(FILES ${sample_files}
             DESTINATION ${OPENCV_SAMPLES_SRC_INSTALL_PATH}/${module_id}
-            PERMISSIONS OWNER_READ GROUP_READ WORLD_READ COMPONENT samples)
+            PERMISSIONS OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ COMPONENT samples)
   endif()
 endfunction()
 
@@ -919,25 +930,28 @@ macro(__ocv_track_module_link_dependencies the_module optkind)
       list(REMOVE_AT __mod_depends 0)
       if(__dep STREQUAL the_module)
         set(__has_cycle TRUE)
-      else()#if("${OPENCV_MODULES_BUILD}" MATCHES "(^|;)${__dep}(;|$)")
+      else()
         ocv_regex_escape(__rdep "${__dep}")
         if(__resolved_deps MATCHES "(^|;)${__rdep}(;|$)")
           #all dependencies of this module are already resolved
           list(APPEND ${the_module}_MODULE_DEPS_${optkind} "${__dep}")
         elseif(TARGET ${__dep})
-          get_target_property(__module_type ${__dep} TYPE)
-          if(__module_type STREQUAL "STATIC_LIBRARY")
-            if(NOT DEFINED ${__dep}_LIB_DEPENDS_${optkind})
-              ocv_split_libs_list(${__dep}_LIB_DEPENDS ${__dep}_LIB_DEPENDS_DBG ${__dep}_LIB_DEPENDS_OPT)
+          get_target_property(__dep_imported ${__dep} IMPORTED)
+          if(__dep_imported)
+            list(APPEND ${the_module}_EXTRA_DEPS_${optkind} "${__dep}")
+          else()
+            get_target_property(__module_type ${__dep} TYPE)
+            if(__module_type STREQUAL "STATIC_LIBRARY")
+              if(NOT DEFINED ${__dep}_LIB_DEPENDS_${optkind})
+                ocv_split_libs_list(${__dep}_LIB_DEPENDS ${__dep}_LIB_DEPENDS_DBG ${__dep}_LIB_DEPENDS_OPT)
+              endif()
+              list(INSERT __mod_depends 0 ${${__dep}_LIB_DEPENDS_${optkind}} ${__dep})
+              list(APPEND __resolved_deps "${__dep}")
             endif()
-            list(INSERT __mod_depends 0 ${${__dep}_LIB_DEPENDS_${optkind}} ${__dep})
-            list(APPEND __resolved_deps "${__dep}")
           endif()
         else()
           list(APPEND  ${the_module}_EXTRA_DEPS_${optkind} "${__dep}")
         endif()
-      #else()
-       # get_target_property(__dep_location "${__dep}" LOCATION)
       endif()
     endwhile()
 
@@ -951,7 +965,7 @@ macro(__ocv_track_module_link_dependencies the_module optkind)
       list(APPEND ${the_module}_MODULE_DEPS_${optkind} "${the_module}")
     endif()
 
-    unset(__dep_location)
+    unset(__dep_imported)
     unset(__mod_depends)
     unset(__resolved_deps)
     unset(__has_cycle)

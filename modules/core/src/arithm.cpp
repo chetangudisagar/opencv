@@ -427,7 +427,7 @@ struct _VAdd32f { __m128 operator()(const __m128& a, const __m128& b) const { re
 struct _VSub32f { __m128 operator()(const __m128& a, const __m128& b) const { return _mm_sub_ps(a,b); }};
 struct _VMin32f { __m128 operator()(const __m128& a, const __m128& b) const { return _mm_min_ps(a,b); }};
 struct _VMax32f { __m128 operator()(const __m128& a, const __m128& b) const { return _mm_max_ps(a,b); }};
-static int CV_DECL_ALIGNED(16) v32f_absmask[] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
+static unsigned int CV_DECL_ALIGNED(16) v32f_absmask[] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
 struct _VAbsDiff32f
 {
     __m128 operator()(const __m128& a, const __m128& b) const
@@ -441,7 +441,7 @@ struct _VSub64f { __m128d operator()(const __m128d& a, const __m128d& b) const {
 struct _VMin64f { __m128d operator()(const __m128d& a, const __m128d& b) const { return _mm_min_pd(a,b); }};
 struct _VMax64f { __m128d operator()(const __m128d& a, const __m128d& b) const { return _mm_max_pd(a,b); }};
 
-static int CV_DECL_ALIGNED(16) v64f_absmask[] = { 0xffffffff, 0x7fffffff, 0xffffffff, 0x7fffffff };
+static unsigned int CV_DECL_ALIGNED(16) v64f_absmask[] = { 0xffffffff, 0x7fffffff, 0xffffffff, 0x7fffffff };
 struct _VAbsDiff64f
 {
     __m128d operator()(const __m128d& a, const __m128d& b) const
@@ -522,11 +522,19 @@ template<typename T> struct OpNot
     T operator()( T a, T ) const { return ~a; }
 };
 
+
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
+#endif
 static inline void fixSteps(Size sz, size_t elemSize, size_t& step1, size_t& step2, size_t& step)
 {
     if( sz.height == 1 )
         step1 = step2 = step = sz.width*elemSize;
 }
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 
 static void add8u( const uchar* src1, size_t step1,
                    const uchar* src2, size_t step2,

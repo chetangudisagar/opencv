@@ -1,6 +1,3 @@
-/*! \file core.hpp
-    \brief The Core Functionality
- */
 /*M///////////////////////////////////////////////////////////////////////////////////////
 //
 //  IMPORTANT: READ BEFORE DOWNLOADING, COPYING, INSTALLING OR USING.
@@ -410,7 +407,7 @@ public:
   The class is specialized for each fundamental numerical data type supported by OpenCV.
   It provides DataDepth<T>::value constant.
 */
-template<typename _Tp> class DataDepth {};
+template<typename _Tp> class DataDepth { public: enum { value = -1, fmt = 0 }; };
 
 template<> class DataDepth<bool> { public: enum { value = CV_8U, fmt=(int)'u' }; };
 template<> class DataDepth<uchar> { public: enum { value = CV_8U, fmt=(int)'u' }; };
@@ -883,8 +880,10 @@ public:
 
 
 typedef Point_<int> Point2i;
+typedef Point_<int64> Point2l;
 typedef Point2i Point;
 typedef Size_<int> Size2i;
+typedef Size_<int64> Size2l;
 typedef Size_<double> Size2d;
 typedef Size2i Size;
 typedef Rect_<int> Rect;
@@ -913,8 +912,10 @@ public:
 
     //! returns 4 vertices of the rectangle
     void points(Point2f pts[]) const;
-    //! returns the minimal up-right rectangle containing the rotated rectangle
+    //! returns the minimal up-right integer rectangle containing the rotated rectangle
     Rect boundingRect() const;
+    //! returns the minimal (exact) floating point rectangle containing the rotated rectangle, not intended for use with images
+    Rect_<float> boundingRect2f() const;
     //! conversion to the old-style CvBox2D structure
     operator CvBox2D() const;
 
@@ -2596,6 +2597,9 @@ CV_EXPORTS_W double kmeans( InputArray data, int K, CV_OUT InputOutputArray best
 //! returns the thread-local Random number generator
 CV_EXPORTS RNG& theRNG();
 
+//! sets state of the thread-local Random number generator
+CV_EXPORTS_W void setRNGSeed(int seed);
+
 //! returns the next unifomly-distributed random number of the specified type
 template<typename _Tp> static inline _Tp randu() { return (_Tp)theRNG(); }
 
@@ -2642,6 +2646,44 @@ CV_EXPORTS_W void ellipse(CV_IN_OUT Mat& img, Point center, Size axes,
 CV_EXPORTS_W void ellipse(CV_IN_OUT Mat& img, const RotatedRect& box, const Scalar& color,
                         int thickness=1, int lineType=8);
 
+/* ----------------------------------------------------------------------------------------- */
+/* ADDING A SET OF PREDEFINED MARKERS WHICH COULD BE USED TO HIGHLIGHT POSITIONS IN AN IMAGE */
+/* ----------------------------------------------------------------------------------------- */
+
+//! Possible set of marker types used for the drawMarker function
+enum MarkerTypes
+{
+    MARKER_CROSS = 0,           // A crosshair marker shape
+    MARKER_TILTED_CROSS = 1,    // A 45 degree tilted crosshair marker shape
+    MARKER_STAR = 2,            // A star marker shape, combination of cross and tilted cross
+    MARKER_DIAMOND = 3,         // A diamond marker shape
+    MARKER_SQUARE = 4,          // A square marker shape
+    MARKER_TRIANGLE_UP = 5,     // An upwards pointing triangle marker shape
+    MARKER_TRIANGLE_DOWN = 6    // A downwards pointing triangle marker shape
+};
+
+/** @brief Draws a marker on a predefined position in an image.
+
+The function drawMarker draws a marker on a given position in the image. For the moment several
+marker types are supported (`MARKER_CROSS`, `MARKER_TILTED_CROSS`, `MARKER_STAR`, `MARKER_DIAMOND`, `MARKER_SQUARE`,
+`MARKER_TRIANGLE_UP` and `MARKER_TRIANGLE_DOWN`).
+
+@param img Image.
+@param position The point where the crosshair is positioned.
+@param markerType The specific type of marker you want to use, see
+@param color Line color.
+@param thickness Line thickness.
+@param line_type Type of the line, see cv::LineTypes
+@param markerSize The length of the marker axis [default = 20 pixels]
+ */
+CV_EXPORTS_W void drawMarker(CV_IN_OUT Mat& img, Point position, const Scalar& color,
+                             int markerType = MARKER_CROSS, int markerSize=20, int thickness=1,
+                             int line_type=8);
+
+/* ----------------------------------------------------------------------------------------- */
+/* END OF MARKER SECTION */
+/* ----------------------------------------------------------------------------------------- */
+
 //! draws a filled convex polygon in the image
 CV_EXPORTS void fillConvexPoly(Mat& img, const Point* pts, int npts,
                                const Scalar& color, int lineType=8,
@@ -2671,6 +2713,7 @@ CV_EXPORTS_W void polylines(InputOutputArray img, InputArrayOfArrays pts,
 
 //! clips the line segment by the rectangle Rect(0, 0, imgSize.width, imgSize.height)
 CV_EXPORTS bool clipLine(Size imgSize, CV_IN_OUT Point& pt1, CV_IN_OUT Point& pt2);
+CV_EXPORTS bool clipLine(Size2l imgSize, CV_IN_OUT Point2l& pt1, CV_IN_OUT Point2l& pt2);
 
 //! clips the line segment by the rectangle imgRect
 CV_EXPORTS_W bool clipLine(Rect imgRect, CV_OUT CV_IN_OUT Point& pt1, CV_OUT CV_IN_OUT Point& pt2);
@@ -2708,6 +2751,9 @@ public:
 CV_EXPORTS_W void ellipse2Poly( Point center, Size axes, int angle,
                                 int arcStart, int arcEnd, int delta,
                                 CV_OUT vector<Point>& pts );
+CV_EXPORTS void ellipse2Poly( Point2d center, Size2d axes, int angle,
+                              int arcStart, int arcEnd, int delta,
+                              CV_OUT vector<Point2d>& pts );
 
 enum
 {
@@ -3201,6 +3247,9 @@ public:
     operator _Tp* ();
     //! returns read-only pointer to the real buffer, stack-allocated or head-allocated
     operator const _Tp* () const;
+
+    //! returns number of allocated elements
+    size_t getSize() const;
 
 protected:
     //! pointer to the real buffer, can point to buf if the buffer is small enough

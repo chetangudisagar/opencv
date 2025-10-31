@@ -64,7 +64,7 @@ In our world, achieving some tasks is possible in multiple ways. However, some o
 
 Now the best option would be to do the integration yourself. For this, you first need to have the source code. I recommend following the guides for your operating system on acquiring OpenCV sources. For Linux users look :ref:`here <Linux-Installation>` and for :ref:`Windows here <Windows_Installation>`. You must also install python and sphinx with its dependencies in order to be able to build the documentation.
 
-Once you have downloaded the repository to your hard drive you can take a look in the OpenCV directory to make sure you have both the samples and doc folder present. Anyone may download the latest source files from :file:`git://github.com/Itseez/opencv.git`. Nevertheless, not everyone has upload (commit/submit) rights. This is to protect the integrity of the library. If you plan doing more than one tutorial, and would like to have an account with commit user rights you should first register an account at http://code.opencv.org/ and then contact OpenCV administrator -delete-admin@-delete-opencv.org. Otherwise, you can just send the resulting files to us at -delete-admin@-delete-opencv.org and we'll add it.
+Once you have downloaded the repository to your hard drive you can take a look in the OpenCV directory to make sure you have both the samples and doc folder present. Anyone may download the latest source files from :file:`git://github.com/opencv/opencv.git`. Nevertheless, not everyone has upload (commit/submit) rights. This is to protect the integrity of the library. If you plan doing more than one tutorial, and would like to have an account with commit user rights you should first register an account at http://code.opencv.org/ and then contact OpenCV administrator -delete-admin@-delete-opencv.org. Otherwise, you can just send the resulting files to us at -delete-admin@-delete-opencv.org and we'll add it.
 
 Format the Source Code
 ======================
@@ -358,7 +358,7 @@ Now here's our recommendation for the structure of the tutorial (although, remem
           .. raw:: html
 
              <div align="center">
-             <iframe title="Creating a video with OpenCV" width="560" height="349" src="http://www.youtube.com/embed/jpBwHxsl1_0?rel=0&loop=1" frameborder="0" allowfullscreen align="middle"></iframe>
+             <iframe title="Creating a video with OpenCV" width="560" height="349" src="https://www.youtube.com/embed/jpBwHxsl1_0?rel=0&loop=1" frameborder="0" allowfullscreen align="middle"></iframe>
              </div>
 
        This results in the text and video: You may observe a runtime instance of this on the `YouTube here <https://www.youtube.com/watch?v=jpBwHxsl1_0>`_.
@@ -366,7 +366,7 @@ Now here's our recommendation for the structure of the tutorial (although, remem
        .. raw:: html
 
           <div align="center">
-          <iframe title="Creating a video with OpenCV" width="560" height="349" src="http://www.youtube.com/embed/jpBwHxsl1_0?rel=0&loop=1" frameborder="0" allowfullscreen align="middle"></iframe>
+          <iframe title="Creating a video with OpenCV" width="560" height="349" src="https://www.youtube.com/embed/jpBwHxsl1_0?rel=0&loop=1" frameborder="0" allowfullscreen align="middle"></iframe>
           </div>
 
      When these aren't self-explanatory make sure to throw in a few guiding lines about what and why we can see.

@@ -15,19 +15,10 @@ endif()
 
 set(CMAKE_MODULE_PATH "${OpenCV_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
-foreach(var INCLUDE LIBRARY PROGRAM)
-  set(__old_frpm_${var} "${CMAKE_FIND_ROOT_PATH_MODE_${var}}")
-endforeach()
-
-set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY BOTH)
-set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE NEVER)
-
-find_package(CUDA 4.2 QUIET)
-
-foreach(var INCLUDE LIBRARY PROGRAM)
-  set(CMAKE_FIND_ROOT_PATH_MODE_${var} "${__old_frpm_${var}}")
-endforeach()
+if(ANDROID AND "${CUDA_VERSION}" VERSION_LESS "7.0")
+  set(CUDA_TARGET_OS_VARIANT "Android")
+endif()
+find_host_package(CUDA 4.2 QUIET)
 
 list(REMOVE_AT CMAKE_MODULE_PATH 0)
 
@@ -44,7 +35,18 @@ if(CUDA_FOUND)
 
   if(WITH_NVCUVID)
     find_cuda_helper_libs(nvcuvid)
-    set(HAVE_NVCUVID 1)
+
+    if(WIN32)
+      find_cuda_helper_libs(nvcuvenc)
+    endif()
+
+    if(CUDA_nvcuvid_LIBRARY)
+      set(HAVE_NVCUVID 1)
+    endif()
+
+    if(CUDA_nvcuvenc_LIBRARY)
+      set(HAVE_NVCUVENC 1)
+    endif()
   endif()
 
   message(STATUS "CUDA detected: " ${CUDA_VERSION})
@@ -95,12 +97,14 @@ if(CUDA_FOUND)
         set(__cuda_arch_bin "3.2")
         set(__cuda_arch_ptx "")
       elseif(AARCH64)
-        set(__cuda_arch_bin "5.2")
+        set(__cuda_arch_bin "5.3")
         set(__cuda_arch_ptx "")
       endif()
     else()
       if(${CUDA_VERSION} VERSION_LESS "5.0")
         set(__cuda_arch_bin "1.1 1.2 1.3 2.0 2.1(2.0) 3.0")
+      elseif(${CUDA_VERSION} VERSION_GREATER "6.5")
+        set(__cuda_arch_bin "2.0 2.1(2.0) 3.0 3.5")
       else()
         set(__cuda_arch_bin "1.1 1.2 1.3 2.0 2.1(2.0) 3.0 3.5")
       endif()
@@ -159,10 +163,6 @@ if(CUDA_FOUND)
 
   if(ANDROID)
     set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} "-Xptxas;-dlcm=ca")
-    if(${CUDA_VERSION} VERSION_LESS "7.0")
-      # since CUDA 7.0 OS variant is depricated
-      set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} "-target-os-variant=Android")
-    endif()
   endif()
 
   message(STATUS "CUDA NVCC target flags: ${CUDA_NVCC_FLAGS}")
@@ -212,7 +212,7 @@ if(CUDA_FOUND)
     endif()
 
     # disabled because of multiple warnings during building nvcc auto generated files
-    if(CMAKE_COMPILER_IS_GNUCXX AND CMAKE_GCC_REGEX_VERSION VERSION_GREATER "4.6.0")
+    if(CMAKE_COMPILER_IS_GNUCXX AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER "4.6.0")
       ocv_warnings_disable(CMAKE_CXX_FLAGS -Wunused-but-set-variable)
     endif()
 
@@ -229,40 +229,18 @@ else()
 endif()
 
 if(HAVE_CUDA)
-  set(CUDA_LIBS_PATH "")
-  foreach(p ${CUDA_LIBRARIES} ${CUDA_npp_LIBRARY})
-    get_filename_component(_tmp ${p} PATH)
-    list(APPEND CUDA_LIBS_PATH ${_tmp})
-  endforeach()
-
-  if(HAVE_CUBLAS)
-    foreach(p ${CUDA_cublas_LIBRARY})
-      get_filename_component(_tmp ${p} PATH)
-      list(APPEND CUDA_LIBS_PATH ${_tmp})
-    endforeach()
-  endif()
-
-  if(HAVE_CUFFT)
-    foreach(p ${CUDA_cufft_LIBRARY})
-      get_filename_component(_tmp ${p} PATH)
-      list(APPEND CUDA_LIBS_PATH ${_tmp})
-    endforeach()
-  endif()
-
-  list(REMOVE_DUPLICATES CUDA_LIBS_PATH)
-  link_directories(${CUDA_LIBS_PATH})
-
   set(CUDA_LIBRARIES_ABS ${CUDA_LIBRARIES})
-  ocv_convert_to_lib_name(CUDA_LIBRARIES ${CUDA_LIBRARIES})
+  ocv_create_imported_targets(CUDA_LIBRARIES ${CUDA_LIBRARIES})
   set(CUDA_npp_LIBRARY_ABS ${CUDA_npp_LIBRARY})
-  ocv_convert_to_lib_name(CUDA_npp_LIBRARY ${CUDA_npp_LIBRARY})
+  ocv_create_imported_targets(CUDA_npp_LIBRARY ${CUDA_npp_LIBRARY})
+
   if(HAVE_CUBLAS)
     set(CUDA_cublas_LIBRARY_ABS ${CUDA_cublas_LIBRARY})
-    ocv_convert_to_lib_name(CUDA_cublas_LIBRARY ${CUDA_cublas_LIBRARY})
+    ocv_create_imported_targets(CUDA_cublas_LIBRARY ${CUDA_cublas_LIBRARY})
   endif()
 
   if(HAVE_CUFFT)
     set(CUDA_cufft_LIBRARY_ABS ${CUDA_cufft_LIBRARY})
-    ocv_convert_to_lib_name(CUDA_cufft_LIBRARY ${CUDA_cufft_LIBRARY})
+    ocv_create_imported_targets(CUDA_cufft_LIBRARY ${CUDA_cufft_LIBRARY})
   endif()
 endif()

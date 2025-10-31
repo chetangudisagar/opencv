@@ -369,6 +369,12 @@ void cv::fisheye::undistortPoints( InputArray distorted, OutputArray undistorted
         double scale = 1.0;
 
         double theta_d = sqrt(pw[0]*pw[0] + pw[1]*pw[1]);
+
+        // the current camera model is only valid up to 180° FOV
+        // for larger FOV the loop below does not converge
+        // clip values so we still get plausible results for super fisheye images > 180°
+        theta_d = min(max(-CV_PI/2., theta_d), CV_PI/2.);
+
         if (theta_d > 1e-8)
         {
             // compensate distortion iteratively
@@ -794,8 +800,42 @@ double cv::fisheye::calibrate(InputArrayOfArrays objectPoints, InputArrayOfArray
 
     if (K.needed()) cv::Mat(_K).convertTo(K, K.empty() ? CV_64FC1 : K.type());
     if (D.needed()) cv::Mat(finalParam.k).convertTo(D, D.empty() ? CV_64FC1 : D.type());
-    if (rvecs.needed()) cv::Mat(omc).convertTo(rvecs, rvecs.empty() ? CV_64FC3 : rvecs.type());
-    if (tvecs.needed()) cv::Mat(Tc).convertTo(tvecs, tvecs.empty() ? CV_64FC3 : tvecs.type());
+
+    if (rvecs.needed())
+    {
+        if( rvecs.kind() == _InputArray::STD_VECTOR_MAT )
+        {
+            rvecs.create((int)objectPoints.total(), 1, CV_64FC3);
+            for( int i = 0; i < (int)objectPoints.total(); i++ )
+            {
+                rvecs.create(3, 1, CV_64F, i, true);
+                Mat rv = rvecs.getMat(i);
+                *rv.ptr<Vec3d>(0) = omc[i];
+            }
+        }
+        else
+        {
+            cv::Mat(omc).convertTo(rvecs, rvecs.fixedType() ? rvecs.type() : CV_64FC3);
+        }
+    }
+
+    if (tvecs.needed())
+    {
+        if( tvecs.kind() == _InputArray::STD_VECTOR_MAT )
+        {
+            tvecs.create((int)objectPoints.total(), 1, CV_64FC3);
+            for( int i = 0; i < (int)objectPoints.total(); i++ )
+            {
+                tvecs.create(3, 1, CV_64F, i, true);
+                Mat tv = tvecs.getMat(i);
+                *tv.ptr<Vec3d>(0) = Tc[i];
+            }
+        }
+        else
+        {
+            cv::Mat(Tc).convertTo(tvecs, tvecs.fixedType() ? tvecs.type() : CV_64FC3);
+        }
+    }
 
     return rms;
 }
@@ -994,8 +1034,10 @@ double cv::fisheye::stereoCalibrate(InputArrayOfArrays objectPoints, InputArrayO
         int a = cv::countNonZero(intrinsicLeft.isEstimate);
         int b = cv::countNonZero(intrinsicRight.isEstimate);
         cv::Mat deltas = J2_inv * J.t() * e;
-        intrinsicLeft = intrinsicLeft + deltas.rowRange(0, a);
-        intrinsicRight = intrinsicRight + deltas.rowRange(a, a + b);
+        if (a > 0)
+            intrinsicLeft = intrinsicLeft + deltas.rowRange(0, a);
+        if (b > 0)
+            intrinsicRight = intrinsicRight + deltas.rowRange(a, a + b);
         omcur = omcur + cv::Vec3d(deltas.rowRange(a + b, a + b + 3));
         Tcur = Tcur + cv::Vec3d(deltas.rowRange(a + b + 3, a + b + 6));
         for (int image_idx = 0; image_idx < n_images; ++image_idx)

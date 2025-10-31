@@ -42,6 +42,7 @@
 
 #include "precomp.hpp"
 #include "bitstrm.hpp"
+#include "utils.hpp"
 
 namespace cv
 {
@@ -103,7 +104,6 @@ void  RBaseStream::readBlock()
     fseek( m_file, m_block_pos, SEEK_SET );
     size_t readed = fread( m_start, 1, m_block_size, m_file );
     m_end = m_start + readed;
-    m_current = m_start;
 
     if( readed == 0 || m_current >= m_end )
         throw RBS_THROW_EOS;
@@ -164,7 +164,7 @@ void  RBaseStream::release()
 
 void  RBaseStream::setPos( int pos )
 {
-    assert( isOpened() && pos >= 0 );
+    CV_Assert(isOpened() && pos >= 0);
 
     if( !m_file )
     {
@@ -181,14 +181,19 @@ void  RBaseStream::setPos( int pos )
 
 int  RBaseStream::getPos()
 {
-    assert( isOpened() );
-    return m_block_pos + (int)(m_current - m_start);
+    CV_Assert(isOpened());
+    int pos = validateToInt((m_current - m_start) + m_block_pos);
+    CV_Assert(pos >= m_block_pos); // overflow check
+    CV_Assert(pos >= 0); // overflow check
+    return pos;
 }
 
 void  RBaseStream::skip( int bytes )
 {
-    assert( bytes >= 0 );
+    CV_Assert(bytes >= 0);
+    uchar* old = m_current;
     m_current += bytes;
+    CV_Assert(m_current >= old);  // overflow check
 }
 
 /////////////////////////  RLByteStream ////////////////////////////
@@ -208,6 +213,8 @@ int  RLByteStream::getByte()
         current = m_current;
     }
 
+    CV_Assert(current < m_end);
+
     val = *((uchar*)current);
     m_current = current + 1;
     return val;
@@ -218,7 +225,7 @@ int RLByteStream::getBytes( void* buffer, int count )
 {
     uchar*  data = (uchar*)buffer;
     int readed = 0;
-    assert( count >= 0 );
+    CV_Assert(count >= 0);
 
     while( count > 0 )
     {
@@ -369,7 +376,7 @@ void  WBaseStream::writeBlock()
 {
     int size = (int)(m_current - m_start);
 
-    assert( isOpened() );
+    CV_Assert(isOpened());
     if( size == 0 )
         return;
 
@@ -440,7 +447,7 @@ void  WBaseStream::release()
 
 int  WBaseStream::getPos()
 {
-    assert( isOpened() );
+    CV_Assert(isOpened());
     return m_block_pos + (int)(m_current - m_start);
 }
 
@@ -463,7 +470,7 @@ void WLByteStream::putBytes( const void* buffer, int count )
 {
     uchar* data = (uchar*)buffer;
 
-    assert( data && m_current && count >= 0 );
+    CV_Assert(data && m_current && count >= 0);
 
     while( count )
     {

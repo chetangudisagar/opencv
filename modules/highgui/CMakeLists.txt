@@ -64,7 +64,7 @@ set(highgui_srcs
     src/window.cpp
     )
 
-file(GLOB highgui_ext_hdrs "include/opencv2/${name}/*.hpp" "include/opencv2/${name}/*.h")
+file(GLOB highgui_ext_hdrs "include/opencv2/*.hpp" "include/opencv2/${name}/*.hpp" "include/opencv2/${name}/*.h")
 
 if(HAVE_QT5)
   set(CMAKE_AUTOMOC ON)
@@ -215,8 +215,13 @@ if(HAVE_IMAGEIO AND IOS)
 endif()
 
 if(HAVE_AVFOUNDATION)
-  list(APPEND highgui_srcs src/cap_avfoundation.mm)
-  list(APPEND HIGHGUI_LIBRARIES "-framework AVFoundation" "-framework QuartzCore")
+  if(IOS)
+    list(APPEND highgui_srcs ${CMAKE_CURRENT_LIST_DIR}/src/cap_avfoundation.mm)
+    list(APPEND HIGHGUI_LIBRARIES "-framework AVFoundation" "-framework QuartzCore")
+  else()
+    list(APPEND highgui_srcs ${CMAKE_CURRENT_LIST_DIR}/src/cap_avfoundation_mac.mm)
+    list(APPEND HIGHGUI_LIBRARIES "-framework Cocoa" "-framework Accelerate" "-framework AVFoundation" "-framework CoreGraphics" "-framework CoreMedia" "-framework CoreVideo" "-framework QuartzCore")
+  endif()
 endif()
 
 if(HAVE_QUICKTIME)
@@ -236,7 +241,7 @@ endif(HAVE_INTELPERC)
 if(IOS)
   add_definitions(-DHAVE_IOS=1)
   list(APPEND highgui_srcs src/ios_conversions.mm src/cap_ios_abstract_camera.mm src/cap_ios_photo_camera.mm src/cap_ios_video_camera.mm)
-  list(APPEND HIGHGUI_LIBRARIES "-framework Accelerate" "-framework AVFoundation" "-framework CoreGraphics" "-framework CoreImage" "-framework CoreMedia" "-framework CoreVideo" "-framework QuartzCore" "-framework AssetsLibrary")
+  list(APPEND HIGHGUI_LIBRARIES "-framework Accelerate" "-framework AVFoundation" "-framework CoreGraphics" "-framework CoreMedia" "-framework CoreVideo" "-framework QuartzCore" "-framework UIKit")
 endif()
 
 if(WIN32)
@@ -288,11 +293,8 @@ if(MSVC)
   set_target_properties(${the_module} PROPERTIES LINK_FLAGS "/NODEFAULTLIB:atlthunk.lib /NODEFAULTLIB:atlsd.lib /NODEFAULTLIB:libcmt.lib /DEBUG")
 endif()
 
-#stop automatic dependencies propagation for this module
-set_target_properties(${the_module} PROPERTIES LINK_INTERFACE_LIBRARIES "")
-
 ocv_add_precompiled_headers(${the_module})
-ocv_warnings_disable(CMAKE_CXX_FLAGS -Wno-deprecated-declarations)
+ocv_warnings_disable(CMAKE_CXX_FLAGS -Wno-deprecated-declarations -Wno-clobbered)
 
 if(WIN32 AND WITH_FFMPEG)
   #copy ffmpeg dll to the output folder

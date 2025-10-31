@@ -163,8 +163,6 @@ std::wstring GetTempFileNameWinRT(std::wstring prefix)
 #include <sys/types.h>
 #if defined ANDROID
 #include <sys/sysconf.h>
-#else
-#include <sys/sysctl.h>
 #endif
 #endif
 
@@ -908,6 +906,11 @@ int _interlockedExchangeAdd(int* addr, int delta)
 
 #elif defined __APPLE__
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 #include <libkern/OSAtomic.h>
 
 struct Mutex::Impl
@@ -923,7 +926,11 @@ struct Mutex::Impl
     int refcount;
 };
 
-#elif defined __linux__ && !defined ANDROID
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
+
+#elif defined __linux__ && !defined ANDROID && !defined __LINUXTHREADS_OLD__
 
 struct Mutex::Impl
 {

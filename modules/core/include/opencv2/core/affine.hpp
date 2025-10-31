@@ -203,11 +203,13 @@ cv::Affine3<T>::Affine3(const cv::Mat& data, const Vec3& t)
     {
         rotation(data(Rect(0, 0, 3, 3)));
         translation(data(Rect(3, 0, 1, 3)));
-        return;
+    }
+    else
+    {
+        rotation(data);
+        translation(t);
     }
 
-    rotation(data);
-    translation(t);
     matrix.val[12] = matrix.val[13] = matrix.val[14] = 0;
     matrix.val[15] = 1;
 }
@@ -243,7 +245,7 @@ void cv::Affine3<T>::rotation(const Vec3& _rvec)
         double c = std::cos(theta);
         double s = std::sin(theta);
         double c1 = 1. - c;
-        double itheta = theta ? 1./theta : 0.;
+        double itheta = (theta != 0) ? 1./theta : 0.;
 
         rx *= itheta; ry *= itheta; rz *= itheta;
 

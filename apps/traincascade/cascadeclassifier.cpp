@@ -136,10 +136,11 @@ bool CvCascadeClassifier::train( const string _cascadeDirName,
                                 const CvCascadeParams& _cascadeParams,
                                 const CvFeatureParams& _featureParams,
                                 const CvCascadeBoostParams& _stageParams,
-                                bool baseFormatSave )
+                                bool baseFormatSave,
+                                double acceptanceRatioBreakValue)
 {
     // Start recording clock ticks for training time output
-    const clock_t begin_time = clock();
+    double time = (double)getTickCount();
 
     if( _cascadeDirName.empty() || _posFilename.empty() || _negFilename.empty() )
         CV_Error( CV_StsBadArg, "_cascadeDirName or _bgfileName or _vecFileName is NULL" );
@@ -169,6 +170,13 @@ bool CvCascadeClassifier::train( const string _cascadeDirName,
         featureEvaluator = CvFeatureEvaluator::create(cascadeParams.featureType);
         featureEvaluator->init( (CvFeatureParams*)featureParams, numPos + numNeg, cascadeParams.winSize );
         stageClassifiers.reserve( numStages );
+    }else{
+        // Make sure that if model parameters are preloaded, that people are aware of this,
+        // even when passing other parameters to the training command
+        cout << "---------------------------------------------------------------------------------" << endl;
+        cout << "Training parameters are pre-loaded from the parameter file in data folder!" << endl;
+        cout << "Please empty this folder if you want to use a NEW set of training parameters." << endl;
+        cout << "---------------------------------------------------------------------------------" << endl;
     }
     cout << "PARAMETERS:" << endl;
     cout << "cascadeDirName: " << _cascadeDirName << endl;
@@ -179,9 +187,11 @@ bool CvCascadeClassifier::train( const string _cascadeDirName,
     cout << "numStages: " << numStages << endl;
     cout << "precalcValBufSize[Mb] : " << _precalcValBufSize << endl;
     cout << "precalcIdxBufSize[Mb] : " << _precalcIdxBufSize << endl;
+    cout << "acceptanceRatioBreakValue : " << acceptanceRatioBreakValue << endl;
     cascadeParams.printAttrs();
     stageParams->printAttrs();
     featureParams->printAttrs();
+    cout << "Number of unique features given windowSize [" << _cascadeParams.winSize.width << "," << _cascadeParams.winSize.height << "] : " << featureEvaluator->getNumFeatures() << "" << endl;
 
     int startNumStages = (int)stageClassifiers.size();
     if ( startNumStages > 1 )
@@ -201,15 +211,20 @@ bool CvCascadeClassifier::train( const string _cascadeDirName,
         if ( !updateTrainingSet( requiredLeafFARate, tempLeafFARate ) )
         {
             cout << "Train dataset for temp stage can not be filled. "
-                "Branch training terminated." << endl;
+                    "Branch training terminated." << endl;
             break;
         }
         if( tempLeafFARate <= requiredLeafFARate )
         {
             cout << "Required leaf false alarm rate achieved. "
-                 "Branch training terminated." << endl;
+                    "Branch training terminated." << endl;
             break;
         }
+        if( (tempLeafFARate <= acceptanceRatioBreakValue) && (acceptanceRatioBreakValue >= 0) ){
+            cout << "The required acceptanceRatio for the model has been reached to avoid overfitting of trainingdata. "
+                    "Branch training terminated." << endl;
+            break;
+}
 
         CvCascadeBoost* tempStage = new CvCascadeBoost;
         bool isStageTrained = tempStage->train( (CvFeatureEvaluator*)featureEvaluator,
@@ -253,7 +268,7 @@ bool CvCascadeClassifier::train( const string _cascadeDirName,
         fs << "}";
 
         // Output training time up till now
-        float seconds = float( clock () - begin_time ) / CLOCKS_PER_SEC;
+        double seconds = ( (double)getTickCount() - time)/ getTickFrequency();
         int days = int(seconds) / 60 / 60 / 24;
         int hours = (int(seconds) / 60 / 60) % 24;
         int minutes = (int(seconds) / 60) % 60;
@@ -322,7 +337,7 @@ int CvCascadeClassifier::fillPassedSamples( int first, int count, bool isPositiv
             consumed++;
 
             featureEvaluator->setImage( img, isPositive ? 1 : 0, i );
-            if( predict( i ) == 1.0F )
+            if( predict( i ) == 1 )
             {
                 getcount++;
                 printf("%s current samples: %d\r", isPositive ? "POS":"NEG", getcount);
@@ -509,8 +524,6 @@ void CvCascadeClassifier::save( const string filename, bool baseFormat )
 
 bool CvCascadeClassifier::load( const string cascadeDirName )
 {
-    cout << "Training parameters are loaded from the parameter file in data folder!" << endl;
-    cout << "Please empty the data folder if you want to use your own set of parameters." << endl;
     FileStorage fs( cascadeDirName + CC_PARAMS_FILENAME, FileStorage::READ );
     if ( !fs.isOpened() )
         return false;

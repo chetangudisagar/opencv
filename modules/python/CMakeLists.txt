@@ -64,7 +64,11 @@ add_library(${the_module} SHARED src2/cv2.cpp ${CMAKE_CURRENT_BINARY_DIR}/genera
 if(PYTHON_DEBUG_LIBRARIES AND NOT PYTHON_LIBRARIES MATCHES "optimized.*debug")
   target_link_libraries(${the_module} debug ${PYTHON_DEBUG_LIBRARIES} optimized ${PYTHON_LIBRARIES})
 else()
-  target_link_libraries(${the_module} ${PYTHON_LIBRARIES})
+  if(APPLE)
+    set_target_properties(${the_module} PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
+  else()
+    target_link_libraries(${the_module} ${PYTHON_LIBRARIES})
+  endif()
 endif()
 target_link_libraries(${the_module} ${OPENCV_MODULE_${the_module}_DEPS})
 
@@ -92,6 +96,8 @@ if(MSVC AND NOT ENABLE_NOISY_WARNINGS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4505") #unreferenced local function has been removed
   string(REPLACE "/W4" "/W3" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
+
+ocv_warnings_disable(CMAKE_CXX_FLAGS -Wundef) # accurate guard via #pragma doesn't work (C++ preprocessor doesn't handle #pragma)
 
 if(MSVC AND NOT BUILD_SHARED_LIBS)
   set_target_properties(${the_module} PROPERTIES LINK_FLAGS "/NODEFAULTLIB:atlthunk.lib /NODEFAULTLIB:atlsd.lib /DEBUG")

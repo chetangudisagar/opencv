@@ -1,3 +1,33 @@
+if(ENABLE_CCACHE AND NOT CMAKE_COMPILER_IS_CCACHE)
+  # This works fine with Unix Makefiles and Ninja generators
+  find_host_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+    message(STATUS "Looking for ccache - found (${CCACHE_PROGRAM})")
+    get_property(__OLD_RULE_LAUNCH_COMPILE GLOBAL PROPERTY RULE_LAUNCH_COMPILE)
+    if(__OLD_RULE_LAUNCH_COMPILE)
+      message(STATUS "Can't replace CMake compiler launcher")
+    else()
+      set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+      # NOTE: Actually this check doesn't work as expected.
+      # "RULE_LAUNCH_COMPILE" is ignored by CMake during try_compile() step.
+      # ocv_check_compiler_flag(CXX "" IS_CCACHE_WORKS)
+      set(IS_CCACHE_WORKS 1)
+      if(IS_CCACHE_WORKS)
+        set(CMAKE_COMPILER_IS_CCACHE 1)
+      else()
+        message(STATUS "Unable to compile program with enabled ccache, reverting...")
+        set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${__OLD_RULE_LAUNCH_COMPILE}")
+      endif()
+    endif()
+  else()
+    message(STATUS "Looking for ccache - not found")
+  endif()
+endif()
+
+if((CMAKE_COMPILER_IS_CLANGCXX OR CMAKE_COMPILER_IS_CLANGCC OR CMAKE_COMPILER_IS_CCACHE) AND NOT CMAKE_GENERATOR MATCHES "Xcode")
+  set(ENABLE_PRECOMPILED_HEADERS OFF CACHE BOOL "" FORCE)
+endif()
+
 if(MINGW OR (X86 AND UNIX AND NOT APPLE))
   # mingw compiler is known to produce unstable SSE code with -O3 hence we are trying to use -O2 instead
   if(CMAKE_COMPILER_IS_GNUCXX)
@@ -63,6 +93,14 @@ if(OPENCV_CAN_BREAK_BINARY_COMPATIBILITY)
   add_definitions(-DOPENCV_CAN_BREAK_BINARY_COMPATIBILITY)
 endif()
 
+if(BUILD_TINY_GPU_MODULE)
+  add_definitions(-DOPENCV_TINY_GPU_MODULE)
+endif()
+
+if(CV_ICC AND NOT ENABLE_FAST_MATH)
+  add_extra_compiler_option("-fp-model precise")
+endif()
+
 if(CMAKE_COMPILER_IS_GNUCXX)
   # High level of warnings.
   add_extra_compiler_option(-W)
@@ -91,6 +129,9 @@ if(CMAKE_COMPILER_IS_GNUCXX)
     add_extra_compiler_option(-Wno-narrowing)
     add_extra_compiler_option(-Wno-delete-non-virtual-dtor)
     add_extra_compiler_option(-Wno-unnamed-type-template-args)
+    add_extra_compiler_option(-Wno-comment)
+    add_extra_compiler_option(-Wno-array-bounds)
+    add_extra_compiler_option(-Wno-aggressive-loop-optimizations)
   endif()
   add_extra_compiler_option(-fdiagnostics-show-option)
 
@@ -102,6 +143,10 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   # We need pthread's
   if(UNIX AND NOT ANDROID AND NOT (APPLE AND CMAKE_COMPILER_IS_CLANGCXX))
     add_extra_compiler_option(-pthread)
+  endif()
+
+  if(CMAKE_COMPILER_IS_CLANGCXX)
+    add_extra_compiler_option(-Qunused-arguments)
   endif()
 
   if(OPENCV_WARNINGS_ARE_ERRORS)
@@ -119,7 +164,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   # Other optimizations
   if(ENABLE_OMIT_FRAME_POINTER)
     add_extra_compiler_option(-fomit-frame-pointer)
-  else()
+  elseif(DEFINED ENABLE_OMIT_FRAME_POINTER)
     add_extra_compiler_option(-fno-omit-frame-pointer)
   endif()
   if(ENABLE_FAST_MATH)
@@ -201,7 +246,10 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   endif()
 
   set(OPENCV_EXTRA_FLAGS_RELEASE "${OPENCV_EXTRA_FLAGS_RELEASE} -DNDEBUG")
-  set(OPENCV_EXTRA_FLAGS_DEBUG "${OPENCV_EXTRA_FLAGS_DEBUG} -O0 -DDEBUG -D_DEBUG")
+  if(NOT " ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG} " MATCHES "-O")
+    set(OPENCV_EXTRA_FLAGS_DEBUG "${OPENCV_EXTRA_FLAGS_DEBUG} -O0")
+  endif()
+  set(OPENCV_EXTRA_FLAGS_DEBUG "${OPENCV_EXTRA_FLAGS_DEBUG} -DDEBUG -D_DEBUG")
 endif()
 
 if(MSVC)
@@ -257,6 +305,11 @@ if(MSVC)
   endif()
 endif()
 
+if(MSVC12 AND NOT CMAKE_GENERATOR MATCHES "Visual Studio")
+  set(OPENCV_EXTRA_C_FLAGS "${OPENCV_EXTRA_C_FLAGS} /FS")
+  set(OPENCV_EXTRA_CXX_FLAGS "${OPENCV_EXTRA_CXX_FLAGS} /FS")
+endif()
+
 # Extra link libs if the user selects building static libs:
 if(NOT BUILD_SHARED_LIBS AND ((CMAKE_COMPILER_IS_GNUCXX AND NOT ANDROID) OR QNX))
   # Android does not need these settings because they are already set by toolchain file
@@ -295,8 +348,13 @@ if(MSVC)
   string(REPLACE "/W3" "/W4" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
   string(REPLACE "/W3" "/W4" CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG}")
 
-  if(NOT ENABLE_NOISY_WARNINGS AND MSVC_VERSION EQUAL 1400)
-    ocv_warnings_disable(CMAKE_CXX_FLAGS /wd4510 /wd4610 /wd4312 /wd4201 /wd4244 /wd4328 /wd4267)
+  if(NOT ENABLE_NOISY_WARNINGS)
+    if(MSVC_VERSION EQUAL 1400)
+      ocv_warnings_disable(CMAKE_CXX_FLAGS /wd4510 /wd4610 /wd4312 /wd4201 /wd4244 /wd4328 /wd4267)
+    endif()
+    if(MSVC_VERSION LESS 1900) # MSVS2015
+      ocv_warnings_disable(CMAKE_CXX_FLAGS /wd4127) # warning C4127: conditional expression is constant
+    endif()
   endif()
 
   # allow extern "C" functions throw exceptions
@@ -309,5 +367,14 @@ if(MSVC)
 
   if(NOT ENABLE_NOISY_WARNINGS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4251") #class 'std::XXX' needs to have dll-interface to be used by clients of YYY
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4275") # non dll-interface class 'std::exception' used as base for dll-interface class 'cv::Exception'
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4589") # Constructor of abstract class ... ignores initializer for virtual base class 'cv::Algorithm'
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4359") # Alignment specifier is less than actual alignment (4), and will be ignored
+  endif()
+
+  if(CV_ICC AND NOT ENABLE_NOISY_WARNINGS)
+    foreach(flags CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_DEBUG CMAKE_C_FLAGS CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_DEBUG)
+      string(REGEX REPLACE "( |^)/W[0-9]+( |$)" "\\1\\2" ${flags} "${${flags}}")
+    endforeach()
   endif()
 endif()

@@ -977,12 +977,12 @@ minMaxLoc_(const _Tp* src, size_t total, size_t startidx,
         for( size_t i = 0; i < total; i++ )
         {
             _Tp val = src[i];
-            if( minval > val )
+            if( minval > val || !minpos )
             {
                 minval = val;
                 minpos = startidx + i;
             }
-            if( maxval < val )
+            if( maxval < val || !maxpos )
             {
                 maxval = val;
                 maxpos = startidx + i;
@@ -994,12 +994,12 @@ minMaxLoc_(const _Tp* src, size_t total, size_t startidx,
         for( size_t i = 0; i < total; i++ )
         {
             _Tp val = src[i];
-            if( minval > val && mask[i] )
+            if( (minval > val || !minpos) && mask[i] )
             {
                 minval = val;
                 minpos = startidx + i;
             }
-            if( maxval < val && mask[i] )
+            if( (maxval < val || !maxpos) && mask[i] )
             {
                 maxval = val;
                 maxpos = startidx + i;
@@ -1046,8 +1046,8 @@ void minMaxLoc(const Mat& src, double* _minval, double* _maxval,
     size_t startidx = 1, total = planes[0].total();
     size_t i, nplanes = it.nplanes;
     int depth = src.depth();
-    double maxval = depth < CV_32F ? INT_MIN : depth == CV_32F ? -FLT_MAX : -DBL_MAX;
-    double minval = depth < CV_32F ? INT_MAX : depth == CV_32F ? FLT_MAX : DBL_MAX;
+    double minval = 0;
+    double maxval = 0;
     size_t maxidx = 0, minidx = 0;
 
     for( i = 0; i < nplanes; i++, ++it, startidx += total )
@@ -1089,9 +1089,6 @@ void minMaxLoc(const Mat& src, double* _minval, double* _maxval,
             CV_Assert(0);
         }
     }
-
-    if( minidx == 0 )
-        minval = maxval = 0;
 
     if( _maxval )
         *_maxval = maxval;
@@ -1760,7 +1757,7 @@ cmpUlpsFlt_(const int* src1, const int* src2, size_t total, int imaxdiff, size_t
     for( i = 0; i < total; i++ )
     {
         int a = src1[i], b = src2[i];
-        if( a < 0 ) a ^= C; if( b < 0 ) b ^= C;
+        if( a < 0 ) { a ^= C; } if( b < 0 ) { b ^= C; }
         int diff = std::abs(a - b);
         if( realmaxdiff < diff )
         {
@@ -1782,7 +1779,7 @@ cmpUlpsFlt_(const int64* src1, const int64* src2, size_t total, int imaxdiff, si
     for( i = 0; i < total; i++ )
     {
         int64 a = src1[i], b = src2[i];
-        if( a < 0 ) a ^= C; if( b < 0 ) b ^= C;
+        if( a < 0 ) { a ^= C; } if( b < 0 ) { b ^= C; }
         double diff = fabs((double)a - (double)b);
         if( realmaxdiff < diff )
         {

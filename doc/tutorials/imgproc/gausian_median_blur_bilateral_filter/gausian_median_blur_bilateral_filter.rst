@@ -81,7 +81,7 @@ Gaussian Filter
 
       G_{0}(x, y) = A  e^{ \dfrac{ -(x - \mu_{x})^{2} }{ 2\sigma^{2}_{x} } +  \dfrac{ -(y - \mu_{y})^{2} }{ 2\sigma^{2}_{y} } }
 
-   where :math:`\mu` is the mean (the peak) and :math:`\sigma` represents the variance (per each of the variables :math:`x` and :math:`y`)
+   where :math:`\mu` is the mean (the peak) and :math:`\sigma` represents the standard deviation (per each of the variables :math:`x` and :math:`y`)
 
 
 Median Filter
@@ -115,7 +115,7 @@ Code
         * Applies 4 different kinds of filters (explained in Theory) and show the filtered images sequentially
 
    * **Downloadable code**:
-     Click `here <https://github.com/Itseez/opencv/tree/master/samples/cpp/tutorial_code/ImgProc/Smoothing.cpp>`_
+     Click `here <https://github.com/opencv/opencv/tree/master/samples/cpp/tutorial_code/ImgProc/Smoothing.cpp>`_
 
    * **Code at glance:**
 
